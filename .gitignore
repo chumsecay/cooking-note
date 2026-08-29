@@ -1,0 +1,64 @@
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+app/build/
+
+# Gradle
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local configuration (SDK path, secrets)
+local.properties
+*.keystore
+*.jks
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+captures/
+.externalNativeBuild/
+.cxx/
+.navigation/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Kotlin
+.kotlin/
+
+# ZCode / agent local
+.zcode/
+
+# Logs & temp
+*.log
+*.tmp
+*.swp
+*~
+
+# Secrets / keys
+**/secrets.properties
+**/api_keys.properties
+.env
+.env.*
+
+# Room schemas (keep if wanted for migrations — currently ignore generated dumps under build)
+# app/schemas/ is intentionally tracked when present

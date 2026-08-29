@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sổ tay Nấu ăn</string>
+    <string name="nav_home">Trang chủ</string>
+    <string name="nav_library">Thư viện</string>
+    <string name="nav_pantry">Tủ lạnh</string>
+    <string name="nav_ai">AI Gợi ý</string>
+    <string name="nav_settings">Cài đặt</string>
+    <string name="action_add">Thêm</string>
+    <string name="action_search">Tìm</string>
+    <string name="action_favorite">Yêu thích</string>
+    <string name="action_share">Chia sẻ</string>
+    <string name="empty_recipes">Chưa có công thức. Nhấn + để thêm món đầu tiên.</string>
+    <string name="hint_search">Tìm theo tên, nguyên liệu…</string>
+    <string name="ai_offline_banner">AI chưa cấu hình. Đang dùng gợi ý cục bộ.</string>
+</resources>
