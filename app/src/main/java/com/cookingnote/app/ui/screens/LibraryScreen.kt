@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -45,7 +46,8 @@ fun LibraryScreen(
     onCreate: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenHistory: () -> Unit,
-    onOpenSearch: () -> Unit
+    onOpenSearch: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val container = LocalAppContainer.current
     val recipes by container.repository.observeRecipes()
@@ -74,6 +76,9 @@ fun LibraryScreen(
                 }
                 IconButton(onClick = onOpenHistory) {
                     Icon(Icons.Filled.History, contentDescription = "Lịch sử")
+                }
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Cài đặt")
                 }
             }
         )

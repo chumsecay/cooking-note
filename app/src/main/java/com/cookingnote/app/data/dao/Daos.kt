@@ -9,6 +9,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.cookingnote.app.data.entity.AiQueryLogEntity
 import com.cookingnote.app.data.entity.CategoryEntity
+import com.cookingnote.app.data.entity.ChatMessageEntity
 import com.cookingnote.app.data.entity.CookHistoryEntity
 import com.cookingnote.app.data.entity.CookHistoryWithRecipe
 import com.cookingnote.app.data.entity.IngredientEntity
@@ -24,6 +25,21 @@ data class RecipeStats(
     val total: Int,
     val favorites: Int
 )
+
+@Dao
+interface ChatMessageDao {
+    @Query("SELECT * FROM chat_messages ORDER BY createdAt ASC")
+    fun observeAll(): Flow<List<ChatMessageEntity>>
+
+    @Query("SELECT * FROM chat_messages ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<ChatMessageEntity>
+
+    @Insert
+    suspend fun insert(message: ChatMessageEntity): Long
+
+    @Query("DELETE FROM chat_messages")
+    suspend fun clear()
+}
 
 @Dao
 interface CategoryDao {
@@ -66,7 +82,10 @@ interface RecipeDao {
     fun observeByCategory(categoryId: Long): Flow<List<RecipeEntity>>
 
     @Query("SELECT * FROM recipes ORDER BY updatedAt DESC")
-    fun observeAllSnapshot(): List<RecipeEntity>
+    suspend fun observeAllSnapshot(): List<RecipeEntity>
+
+    @Query("SELECT * FROM recipes WHERE isFavorite = 1 ORDER BY updatedAt DESC LIMIT :limit")
+    suspend fun favoritesSnapshot(limit: Int): List<RecipeEntity>
 
     @Query(
         """
@@ -166,6 +185,10 @@ interface HistoryDao {
     @Transaction
     @Query("SELECT * FROM cook_history ORDER BY cookedAt DESC LIMIT :limit")
     fun observeRecent(limit: Int = 50): Flow<List<CookHistoryWithRecipe>>
+
+    @Transaction
+    @Query("SELECT * FROM cook_history ORDER BY cookedAt DESC LIMIT :limit")
+    suspend fun recentSnapshot(limit: Int): List<CookHistoryWithRecipe>
 
     @Insert
     suspend fun insert(item: CookHistoryEntity): Long

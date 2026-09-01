@@ -6,6 +6,7 @@ import com.cookingnote.app.data.prefs.AiSettings
 import com.cookingnote.app.data.prefs.AiSettingsStore
 import com.cookingnote.app.data.repository.CookbookRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -45,12 +46,13 @@ class DefaultAiService(
         if (settings.provider == AiProviderType.RULE_BASED || settings.apiKey.isBlank()) {
             return@withContext ruleFallback("AI chưa cấu hình", prompt)
         }
+        val systemContext = runCatching { buildSystemContext() }.getOrNull()
         try {
             val raw = when (settings.provider) {
-                AiProviderType.OPENAI_CHAT -> callChatCompletions(settings, prompt, history)
-                AiProviderType.OPENAI_RESPONSES -> callResponses(settings, prompt, history)
-                AiProviderType.ANTHROPIC -> callAnthropic(settings, prompt, history)
-                AiProviderType.GEMINI -> callGeminiText(settings, prompt, history)
+                AiProviderType.OPENAI_CHAT -> callChatCompletions(settings, prompt, history, systemContext)
+                AiProviderType.OPENAI_RESPONSES -> callResponses(settings, prompt, history, systemContext)
+                AiProviderType.ANTHROPIC -> callAnthropic(settings, prompt, history, systemContext)
+                AiProviderType.GEMINI -> callGeminiText(settings, prompt, history, systemContext)
                 AiProviderType.RULE_BASED -> unreachable()
             }
             raw.toAiSuggestion(settings.provider)
@@ -61,6 +63,28 @@ class DefaultAiService(
             Log.w(TAG, "AI parse failed: ${settings.provider}", e)
             ruleFallback("Phản hồi không đọc được", prompt)
         }
+    }
+
+    private suspend fun buildSystemContext(): String {
+        val pantry = repository.observePantry().first()
+        val favorites = repository.recentFavorites(5)
+        val recent = repository.recentCooked(3)
+        val sb = StringBuilder()
+        sb.appendLine("[Ngữ cảnh người dùng]")
+        if (pantry.isNotEmpty()) {
+            sb.appendLine("Tủ lạnh hiện có:")
+            pantry.forEach { sb.appendLine("- ${it.name}: ${it.amount} ${it.unit}") }
+        }
+        if (favorites.isNotEmpty()) {
+            sb.appendLine("Món yêu thích gần đây:")
+            favorites.forEach { sb.appendLine("- ${it.name}") }
+        }
+        if (recent.isNotEmpty()) {
+            sb.appendLine("Món đã nấu gần đây:")
+            recent.forEach { sb.appendLine("- ${it.recipe.name}") }
+        }
+        sb.appendLine("[Yêu cầu] Trả lời ngắn gọn tiếng Việt, đề xuất món phù hợp với tủ lạnh + sở thích người dùng khi có thể.")
+        return sb.toString().trim()
     }
 
     override suspend fun suggestFromIngredients(ingredients: List<String>): List<AiSuggestion> =
@@ -144,15 +168,22 @@ class DefaultAiService(
     private fun callChatCompletions(
         settings: AiSettings,
         prompt: String,
-        history: List<Pair<String, String>>
+        history: List<Pair<String, String>>,
+        systemContext: String?
     ): AiRaw {
         val url = settings.baseUrl.trimEnd('/') + "/chat/completions"
+        val systemText = buildString {
+            append("Bạn là trợ lý nấu ăn tiếng Việt, gợi ý ngắn gọn.")
+            if (!systemContext.isNullOrBlank()) {
+                append("\n\n").append(systemContext)
+            }
+        }
         val body = buildString {
             append("{")
             append("\"model\":\"").append(settings.model).append("\",")
             append("\"max_tokens\":").append(settings.maxTokens).append(",")
             append("\"messages\":[")
-            append("{\"role\":\"system\",\"content\":\"Bạn là trợ lý nấu ăn tiếng Việt, gợi ý ngắn gọn.\"},")
+            append("{\"role\":\"system\",\"content\":").append(jsonEscape(systemText)).append("},")
             history.forEach { (role, content) ->
                 append("{\"role\":\"").append(role).append("\",\"content\":")
                 append(jsonEscape(content)).append("},")
@@ -210,10 +241,15 @@ class DefaultAiService(
     private fun callResponses(
         settings: AiSettings,
         prompt: String,
-        history: List<Pair<String, String>>
+        history: List<Pair<String, String>>,
+        systemContext: String?
     ): AiRaw {
         val url = settings.baseUrl.trimEnd('/') + "/responses"
         val input = StringBuilder("[")
+        if (!systemContext.isNullOrBlank()) {
+            input.append("{\"role\":\"system\",\"content\":")
+                .append(jsonEscape(systemContext)).append("},")
+        }
         history.forEach { (role, content) ->
             input.append("{\"role\":\"").append(role).append("\",\"content\":")
                 .append(jsonEscape(content)).append("},")
@@ -278,17 +314,24 @@ class DefaultAiService(
     private fun callAnthropic(
         settings: AiSettings,
         prompt: String,
-        history: List<Pair<String, String>>
+        history: List<Pair<String, String>>,
+        systemContext: String?
     ): AiRaw {
         val url = settings.baseUrl.trimEnd('/') + "/v1/messages"
         val messages = history.map { (role, content) ->
             """{"role":"$role","content":${jsonEscape(content)}}"""
         }
+        val systemText = buildString {
+            append("Bạn là trợ lý nấu ăn tiếng Việt, gợi ý ngắn gọn.")
+            if (!systemContext.isNullOrBlank()) {
+                append("\n\n").append(systemContext)
+            }
+        }
         val body = """
             {
               "model": "${settings.model}",
               "max_tokens": ${settings.maxTokens},
-              "system": "Bạn là trợ lý nấu ăn tiếng Việt, gợi ý ngắn gọn.",
+              "system": ${jsonEscape(systemText)},
               "messages": [
                 ${messages.joinToString(",")},
                 {"role":"user","content":${jsonEscape(prompt)}}
@@ -313,21 +356,30 @@ class DefaultAiService(
     private fun callGeminiText(
         settings: AiSettings,
         prompt: String,
-        history: List<Pair<String, String>>
+        history: List<Pair<String, String>>,
+        systemContext: String?
     ): AiRaw {
         val model = settings.model.ifBlank { "gemini-1.5-flash" }
         val url = "${settings.baseUrl.trimEnd('/')}/v1beta/models/$model:generateContent?key=${settings.apiKey}"
-        val parts = StringBuilder("[\"")
-        history.forEach { (role, content) ->
-            parts.append(role).append(": ").append(content.replace("\"", "'")).append("\\n")
+        val sb = StringBuilder()
+        sb.append("[")
+        if (!systemContext.isNullOrBlank()) {
+            sb.append("{\"role\":\"user\",\"parts\":[{\"text\":")
+                .append(jsonEscape("[Hệ thống] " + systemContext))
+                .append("}]},")
+            sb.append("{\"role\":\"model\",\"parts\":[{\"text\":\"Đã nhận ngữ cảnh.\"}]},")
         }
-        parts.append(prompt.replace("\"", "'")).append("\"]")
-        val contents = "[{\"role\":\"user\",\"parts\":[{\"text\":" +
-            jsonEscape("$prompt") +
-            "}]}]"
+        history.forEach { (role, content) ->
+            val mapped = if (role == "user") "user" else "model"
+            sb.append("{\"role\":\"").append(mapped).append("\",\"parts\":[{\"text\":")
+                .append(jsonEscape(content)).append("}]},")
+        }
+        sb.append("{\"role\":\"user\",\"parts\":[{\"text\":")
+            .append(jsonEscape(prompt)).append("}]}")
+        sb.append("]")
         val body = """
             {
-              "contents": ${contents},
+              "contents": ${sb.toString()},
               "generationConfig": {"maxOutputTokens": ${settings.maxTokens}}
             }
         """.trimIndent()

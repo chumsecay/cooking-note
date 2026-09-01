@@ -25,23 +25,26 @@ class AppContainer(context: Context) {
         appContext,
         AppDatabase::class.java,
         AppDatabase.DB_NAME
-    ).addCallback(object : RoomDatabase.Callback() {
-        override fun onCreate(db: SupportSQLiteDatabase) {
-            super.onCreate(db)
-            scope.launch {
-                database.withTransaction {
-                    SeedData.populate(
-                        categoryDao = database.categoryDao,
-                        recipeDao = database.recipeDao,
-                        ingredientDao = database.ingredientDao,
-                        stepDao = database.stepDao,
-                        tagDao = database.tagDao,
-                        pantryDao = database.pantryDao
-                    )
+    )
+        .fallbackToDestructiveMigration()
+        .addCallback(object : RoomDatabase.Callback() {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                super.onCreate(db)
+                scope.launch {
+                    database.withTransaction {
+                        SeedData.populate(
+                            categoryDao = database.categoryDao,
+                            recipeDao = database.recipeDao,
+                            ingredientDao = database.ingredientDao,
+                            stepDao = database.stepDao,
+                            tagDao = database.tagDao,
+                            pantryDao = database.pantryDao
+                        )
+                    }
                 }
             }
-        }
-    }).build()
+        })
+        .build()
 
     val userPrefs = UserPrefsStore(appContext)
     val aiSettings = AiSettingsStore(appContext)
@@ -54,7 +57,8 @@ class AppContainer(context: Context) {
         pantryDao = database.pantryDao,
         historyDao = database.historyDao,
         tagDao = database.tagDao,
-        aiLogDao = database.aiLogDao
+        aiLogDao = database.aiLogDao,
+        chatDao = database.chatDao
     )
 
     val aiService: AiService = DefaultAiService(

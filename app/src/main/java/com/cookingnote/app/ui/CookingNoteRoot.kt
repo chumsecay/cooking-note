@@ -7,7 +7,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.RestaurantMenu
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -49,9 +48,10 @@ private val bottomItems = listOf(
     BottomItem(Route.Home, R.string.nav_home, Icons.Filled.Home),
     BottomItem(Route.Library, R.string.nav_library, Icons.Filled.RestaurantMenu),
     BottomItem(Route.Ai, R.string.nav_ai, Icons.Filled.AutoAwesome),
-    BottomItem(Route.Pantry, R.string.nav_pantry, Icons.Filled.Kitchen),
-    BottomItem(Route.Settings, R.string.nav_settings, Icons.Filled.Settings)
+    BottomItem(Route.Pantry, R.string.nav_pantry, Icons.Filled.Kitchen)
 )
+
+private val bottomRoutes = bottomItems.map { it.route.path }.toSet()
 
 @Composable
 fun CookingNoteRoot() {
@@ -67,8 +67,7 @@ fun CookingNoteRoot() {
 private fun BottomBar(nav: NavHostController) {
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
-    val routesOnBar = bottomItems.map { it.route.path }
-    if (current !in routesOnBar) return
+    if (current !in bottomRoutes) return
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface
     ) {
@@ -101,7 +100,9 @@ private fun AppNavHost(nav: NavHostController, padding: PaddingValues) {
             HomeScreen(
                 onOpenRecipe = { id -> nav.navigate(Route.Detail.of(id)) },
                 onOpenLibrary = { nav.navigate(Route.Library.path) },
-                onOpenAi = { nav.navigate(Route.Ai.path) }
+                onOpenAi = { nav.navigate(Route.Ai.path) },
+                onOpenSettings = { nav.navigate(Route.Settings.path) },
+                onOpenSearch = { nav.navigate(Route.Search.path) }
             )
         }
         composable(Route.Library.path) {
@@ -110,7 +111,8 @@ private fun AppNavHost(nav: NavHostController, padding: PaddingValues) {
                 onCreate = { nav.navigate(Route.Create.path) },
                 onOpenFavorites = { nav.navigate(Route.Favorites.path) },
                 onOpenHistory = { nav.navigate(Route.History.path) },
-                onOpenSearch = { nav.navigate(Route.Search.path) }
+                onOpenSearch = { nav.navigate(Route.Search.path) },
+                onOpenSettings = { nav.navigate(Route.Settings.path) }
             )
         }
         composable(Route.Pantry.path) {

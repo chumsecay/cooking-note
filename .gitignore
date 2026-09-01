@@ -67,3 +67,8 @@ Desktop.ini
 /*.png
 /ui-*.xml
 /ui.xml
+
+# Local dumps
+*.db
+*.db-*
+cn*.db

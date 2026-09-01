@@ -2,6 +2,7 @@ package com.cookingnote.app.data.repository
 
 import com.cookingnote.app.data.dao.AiLogDao
 import com.cookingnote.app.data.dao.CategoryDao
+import com.cookingnote.app.data.dao.ChatMessageDao
 import com.cookingnote.app.data.dao.HistoryDao
 import com.cookingnote.app.data.dao.IngredientDao
 import com.cookingnote.app.data.dao.PantryDao
@@ -11,6 +12,7 @@ import com.cookingnote.app.data.dao.StepDao
 import com.cookingnote.app.data.dao.TagDao
 import com.cookingnote.app.data.entity.AiQueryLogEntity
 import com.cookingnote.app.data.entity.CategoryEntity
+import com.cookingnote.app.data.entity.ChatMessageEntity
 import com.cookingnote.app.data.entity.CookHistoryEntity
 import com.cookingnote.app.data.entity.CookHistoryWithRecipe
 import com.cookingnote.app.data.entity.IngredientEntity
@@ -32,7 +34,8 @@ class CookbookRepository(
     private val pantryDao: PantryDao,
     private val historyDao: HistoryDao,
     private val tagDao: TagDao,
-    private val aiLogDao: AiLogDao
+    private val aiLogDao: AiLogDao,
+    private val chatDao: ChatMessageDao
 ) {
     fun observeRecipes(): Flow<List<RecipeEntity>> = recipeDao.observeAll()
     fun observeFavorites(): Flow<List<RecipeEntity>> = recipeDao.observeFavorites()
@@ -49,6 +52,8 @@ class CookbookRepository(
         recipeDao.observeAllRaw().map { it.shuffled().take(limit) }
             .distinctUntilChanged()
 
+    fun observeChat(): Flow<List<ChatMessageEntity>> = chatDao.observeAll()
+
     suspend fun getRecipe(id: Long): RecipeWithDetails? = recipeDao.getWithDetails(id)
     suspend fun randomRecipes(limit: Int): List<RecipeEntity> = withContext(Dispatchers.IO) {
         recipeDao.observeAllSnapshot().shuffled().take(limit)
@@ -57,6 +62,27 @@ class CookbookRepository(
         val names = pantryDao.getAll().map { it.name.lowercase() }
         if (names.isEmpty()) return randomRecipes(5)
         return recipeDao.findByIngredientNames(names, minMatch = 1).take(10)
+    }
+
+    suspend fun recentFavorites(limit: Int = 5): List<RecipeEntity> = withContext(Dispatchers.IO) {
+        recipeDao.favoritesSnapshot(limit)
+    }
+    suspend fun recentCooked(limit: Int = 3): List<CookHistoryWithRecipe> = withContext(Dispatchers.IO) {
+        historyDao.recentSnapshot(limit)
+    }
+
+    suspend fun appendMessage(role: String, content: String) = withContext(Dispatchers.IO) {
+        chatDao.insert(
+            ChatMessageEntity(role = role, content = content)
+        )
+        Unit
+    }
+
+    suspend fun clearChat() = withContext(Dispatchers.IO) { chatDao.clear() }
+
+    suspend fun recentMessages(limit: Int): List<ChatMessageEntity> = withContext(Dispatchers.IO) {
+        chatDao.recent(limit)
+            .asReversed()
     }
 
     suspend fun saveRecipe(
