@@ -20,6 +20,11 @@ import com.cookingnote.app.data.entity.StepEntity
 import com.cookingnote.app.data.entity.TagEntity
 import kotlinx.coroutines.flow.Flow
 
+data class RecipeStats(
+    val total: Int,
+    val favorites: Int
+)
+
 @Dao
 interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY name")
@@ -60,14 +65,20 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE categoryId = :categoryId ORDER BY updatedAt DESC")
     fun observeByCategory(categoryId: Long): Flow<List<RecipeEntity>>
 
-    @Query("SELECT * FROM recipes ORDER BY RANDOM() LIMIT :limit")
-    suspend fun random(limit: Int): List<RecipeEntity>
+    @Query("SELECT * FROM recipes ORDER BY updatedAt DESC")
+    fun observeAllSnapshot(): List<RecipeEntity>
 
-    @Query("SELECT COUNT(*) FROM recipes")
-    fun observeCount(): Flow<Int>
+    @Query(
+        """
+        SELECT COUNT(*) AS total,
+               SUM(CASE WHEN isFavorite = 1 THEN 1 ELSE 0 END) AS favorites
+        FROM recipes
+        """
+    )
+    fun observeStats(): Flow<RecipeStats>
 
-    @Query("SELECT COUNT(*) FROM recipes WHERE isFavorite = 1")
-    fun observeFavoriteCount(): Flow<Int>
+    @Query("SELECT * FROM recipes")
+    fun observeAllRaw(): kotlinx.coroutines.flow.Flow<List<RecipeEntity>>
 
     @Transaction
     @Query("SELECT * FROM recipes WHERE id = :id")

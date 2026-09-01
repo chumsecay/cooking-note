@@ -62,3 +62,8 @@ Desktop.ini
 
 # Room schemas (keep if wanted for migrations — currently ignore generated dumps under build)
 # app/schemas/ is intentionally tracked when present
+
+# Local screenshots / debug dumps
+/*.png
+/ui-*.xml
+/ui.xml

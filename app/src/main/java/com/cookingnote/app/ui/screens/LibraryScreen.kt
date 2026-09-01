@@ -1,6 +1,7 @@
 package com.cookingnote.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,7 +21,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -30,10 +30,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.cookingnote.app.ui.components.RecipeCard
 import com.cookingnote.app.ui.local.LocalAppContainer
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,8 +48,12 @@ fun LibraryScreen(
     onOpenSearch: () -> Unit
 ) {
     val container = LocalAppContainer.current
-    val recipes by container.repository.observeRecipes().collectAsState(emptyList())
-    val categories by container.repository.observeCategories().collectAsState(emptyList())
+    val recipes by container.repository.observeRecipes()
+        .distinctUntilChanged()
+        .collectAsState(emptyList())
+    val categories by container.repository.observeCategories()
+        .distinctUntilChanged()
+        .collectAsState(emptyList())
     var selectedCategory by remember { mutableStateOf<Long?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -56,54 +62,43 @@ fun LibraryScreen(
         else recipes.filter { it.categoryId == selectedCategory }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Thư viện") },
-                actions = {
-                    IconButton(onClick = onOpenSearch) {
-                        Icon(Icons.Filled.Search, contentDescription = "Tìm")
-                    }
-                    IconButton(onClick = onOpenFavorites) {
-                        Icon(Icons.Filled.Favorite, contentDescription = "Yêu thích")
-                    }
-                    IconButton(onClick = onOpenHistory) {
-                        Icon(Icons.Filled.History, contentDescription = "Lịch sử")
-                    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text("Thư viện") },
+            actions = {
+                IconButton(onClick = onOpenSearch) {
+                    Icon(Icons.Filled.Search, contentDescription = "Tìm")
                 }
+                IconButton(onClick = onOpenFavorites) {
+                    Icon(Icons.Filled.Favorite, contentDescription = "Yêu thích")
+                }
+                IconButton(onClick = onOpenHistory) {
+                    Icon(Icons.Filled.History, contentDescription = "Lịch sử")
+                }
+            }
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = selectedCategory == null,
+                onClick = { selectedCategory = null },
+                label = { Text("Tất cả") }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onCreate) {
-                Icon(Icons.Filled.Add, contentDescription = "Thêm")
+            categories.take(4).forEach { cat ->
+                FilterChip(
+                    selected = selectedCategory == cat.id,
+                    onClick = { selectedCategory = cat.id },
+                    label = { Text(cat.name) }
+                )
             }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = selectedCategory == null,
-                    onClick = { selectedCategory = null },
-                    label = { Text("Tất cả") }
-                )
-                categories.take(4).forEach { cat ->
-                    FilterChip(
-                        selected = selectedCategory == cat.id,
-                        onClick = { selectedCategory = cat.id },
-                        label = { Text(cat.name) }
-                    )
-                }
-            }
+        Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -127,6 +122,14 @@ fun LibraryScreen(
                         }
                     )
                 }
+            }
+            FloatingActionButton(
+                onClick = onCreate,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = "Thêm")
             }
         }
     }

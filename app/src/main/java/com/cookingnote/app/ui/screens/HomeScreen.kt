@@ -21,14 +21,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.cookingnote.app.data.dao.RecipeStats
 import com.cookingnote.app.data.entity.RecipeEntity
 import com.cookingnote.app.ui.components.RecipeCard
 import com.cookingnote.app.ui.local.LocalAppContainer
@@ -40,14 +39,14 @@ fun HomeScreen(
     onOpenAi: () -> Unit
 ) {
     val container = LocalAppContainer.current
-    val recipeCount by container.repository.observeRecipeCount().collectAsState(0)
-    val favoriteCount by container.repository.observeFavoriteCount().collectAsState(0)
-    val favorites by container.repository.observeFavorites().collectAsState(emptyList())
-    var today by remember { mutableStateOf<List<RecipeEntity>>(emptyList()) }
-
-    LaunchedEffect(Unit) {
-        today = container.repository.randomRecipes(3)
-    }
+    val stats by container.repository.observeStats()
+        .distinctUntilChanged()
+        .collectAsState(initial = RecipeStats(0, 0))
+    val favorites by container.repository.observeFavorites()
+        .distinctUntilChanged()
+        .collectAsState(emptyList())
+    val today by container.repository.observeTodaysPick(3)
+        .collectAsState(emptyList())
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -67,8 +66,8 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                StatCard("Công thức", "$recipeCount", Modifier.weight(1f))
-                StatCard("Yêu thích", "$favoriteCount", Modifier.weight(1f))
+                StatCard("Công thức", "${stats.total}", Modifier.weight(1f))
+                StatCard("Yêu thích", "${stats.favorites}", Modifier.weight(1f))
             }
         }
         item {

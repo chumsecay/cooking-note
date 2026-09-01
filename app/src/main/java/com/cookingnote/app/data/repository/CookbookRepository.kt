@@ -6,6 +6,7 @@ import com.cookingnote.app.data.dao.HistoryDao
 import com.cookingnote.app.data.dao.IngredientDao
 import com.cookingnote.app.data.dao.PantryDao
 import com.cookingnote.app.data.dao.RecipeDao
+import com.cookingnote.app.data.dao.RecipeStats
 import com.cookingnote.app.data.dao.StepDao
 import com.cookingnote.app.data.dao.TagDao
 import com.cookingnote.app.data.entity.AiQueryLogEntity
@@ -17,7 +18,11 @@ import com.cookingnote.app.data.entity.PantryItemEntity
 import com.cookingnote.app.data.entity.RecipeEntity
 import com.cookingnote.app.data.entity.RecipeWithDetails
 import com.cookingnote.app.data.entity.StepEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 class CookbookRepository(
     private val recipeDao: RecipeDao,
@@ -39,14 +44,18 @@ class CookbookRepository(
     fun observePantry(): Flow<List<PantryItemEntity>> = pantryDao.observeAll()
     fun observeLowStock(): Flow<List<PantryItemEntity>> = pantryDao.observeLowStock()
     fun observeHistory(limit: Int = 50): Flow<List<CookHistoryWithRecipe>> = historyDao.observeRecent(limit)
-    fun observeRecipeCount(): Flow<Int> = recipeDao.observeCount()
-    fun observeFavoriteCount(): Flow<Int> = recipeDao.observeFavoriteCount()
+    fun observeStats(): Flow<RecipeStats> = recipeDao.observeStats()
+    fun observeTodaysPick(limit: Int = 3): Flow<List<RecipeEntity>> =
+        recipeDao.observeAllRaw().map { it.shuffled().take(limit) }
+            .distinctUntilChanged()
 
     suspend fun getRecipe(id: Long): RecipeWithDetails? = recipeDao.getWithDetails(id)
-    suspend fun randomRecipes(limit: Int): List<RecipeEntity> = recipeDao.random(limit)
+    suspend fun randomRecipes(limit: Int): List<RecipeEntity> = withContext(Dispatchers.IO) {
+        recipeDao.observeAllSnapshot().shuffled().take(limit)
+    }
     suspend fun suggestFromPantry(): List<RecipeEntity> {
         val names = pantryDao.getAll().map { it.name.lowercase() }
-        if (names.isEmpty()) return recipeDao.random(5)
+        if (names.isEmpty()) return randomRecipes(5)
         return recipeDao.findByIngredientNames(names, minMatch = 1).take(10)
     }
 

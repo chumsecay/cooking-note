@@ -14,8 +14,8 @@ import com.cookingnote.app.ui.theme.CookingNoteTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         val container = (application as CookingNoteApp).container
         setContent {
             CompositionLocalProvider(LocalAppContainer provides container) {

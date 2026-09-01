@@ -17,13 +17,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -33,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.cookingnote.app.data.prefs.AiProviderType
+import com.cookingnote.app.data.prefs.AiSettings
 import com.cookingnote.app.ui.local.LocalAppContainer
 import kotlinx.coroutines.launch
 import java.io.File
@@ -46,10 +45,13 @@ fun SettingsScreen() {
     val context = LocalContext.current
 
     var providerExpanded by remember { mutableStateOf(false) }
-    var baseUrl by remember(settings) { mutableStateOf(settings.baseUrl) }
-    var apiKey by remember(settings) { mutableStateOf(settings.apiKey) }
-    var model by remember(settings) { mutableStateOf(settings.model) }
-    var temperature by remember(settings) { mutableFloatStateOf(settings.temperature) }
+    var baseUrl by remember(settings.provider) { mutableStateOf(settings.baseUrl) }
+    var apiKey by remember(settings.provider) { mutableStateOf(settings.apiKey) }
+    var model by remember(settings.provider) { mutableStateOf(settings.model) }
+    var maxTokens by remember(settings.provider) { mutableStateOf(settings.maxTokens.toString()) }
+
+    val keyRequired = settings.provider != AiProviderType.RULE_BASED &&
+        settings.provider.requiresApiKey
 
     Scaffold(topBar = { TopAppBar(title = { Text("Cài đặt") }) }) { padding ->
         Column(
@@ -61,6 +63,7 @@ fun SettingsScreen() {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("AI Provider", style = MaterialTheme.typography.titleLarge)
+
             ExposedDropdownMenuBox(
                 expanded = providerExpanded,
                 onExpandedChange = { providerExpanded = it }
@@ -69,8 +72,10 @@ fun SettingsScreen() {
                     value = settings.provider.label,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Provider") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(providerExpanded) },
+                    label = { Text("Provider / Endpoint chuẩn") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(providerExpanded)
+                    },
                     modifier = Modifier
                         .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         .fillMaxWidth()
@@ -85,8 +90,8 @@ fun SettingsScreen() {
                             onClick = {
                                 providerExpanded = false
                                 scope.launch {
-                                    container.aiSettings.update {
-                                        it.copy(
+                                    container.aiSettings.update { current ->
+                                        current.copy(
                                             provider = type,
                                             baseUrl = type.defaultBaseUrl,
                                             model = type.defaultModel
@@ -100,34 +105,43 @@ fun SettingsScreen() {
                     }
                 }
             }
+
+            Text(
+                "Endpoint sẽ gọi: ${endpointSummary(settings.provider)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             OutlinedTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it },
                 label = { Text("Base URL") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = settings.provider != AiProviderType.RULE_BASED
+                enabled = keyRequired
             )
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
                 label = { Text("API Key") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = settings.provider != AiProviderType.RULE_BASED
+                enabled = keyRequired
             )
             OutlinedTextField(
                 value = model,
                 onValueChange = { model = it },
                 label = { Text("Model") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = settings.provider != AiProviderType.RULE_BASED
+                enabled = keyRequired
             )
-            Text("Temperature: ${"%.1f".format(temperature)}")
-            Slider(
-                value = temperature,
-                onValueChange = { temperature = it },
-                valueRange = 0f..1.5f,
-                enabled = settings.provider != AiProviderType.RULE_BASED
+            OutlinedTextField(
+                value = maxTokens,
+                onValueChange = { v -> maxTokens = v.filter(Char::isDigit).take(5) },
+                label = { Text("max_tokens (256 – 8192)") },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = keyRequired,
+                singleLine = true
             )
+
             Button(
                 onClick = {
                     scope.launch {
@@ -136,7 +150,8 @@ fun SettingsScreen() {
                                 baseUrl = baseUrl.trim(),
                                 apiKey = apiKey.trim(),
                                 model = model.trim(),
-                                temperature = temperature
+                                maxTokens = maxTokens.toIntOrNull()
+                                    ?.coerceIn(256, 8192) ?: 1500
                             )
                         }
                     }
@@ -167,10 +182,19 @@ fun SettingsScreen() {
             ) { Text("Backup SQLite") }
 
             Text(
-                "App: Sổ tay Nấu ăn · Kotlin + Compose + Room · Multi-provider AI",
+                "App: Sổ tay Nấu ăn · Kotlin + Compose + Room · " +
+                    "AI: 3 endpoint chuẩn (Chat Completions, Responses, Anthropic) + Gemini.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
+}
+
+private fun endpointSummary(p: AiProviderType): String = when (p) {
+    AiProviderType.RULE_BASED -> "Không gọi mạng (dùng thư viện cục bộ)."
+    AiProviderType.OPENAI_CHAT -> "POST {baseUrl}/chat/completions (OpenAI-compatible)"
+    AiProviderType.OPENAI_RESPONSES -> "POST {baseUrl}/responses (OpenAI Responses)"
+    AiProviderType.ANTHROPIC -> "POST {baseUrl}/v1/messages (Anthropic)"
+    AiProviderType.GEMINI -> "POST {baseUrl}/v1beta/models/{model}:generateContent?key=..."
 }

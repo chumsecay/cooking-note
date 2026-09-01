@@ -1,11 +1,13 @@
 package com.cookingnote.app.data.entity
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "categories")
+@Immutable
 data class CategoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -25,6 +27,7 @@ data class CategoryEntity(
     ],
     indices = [Index("categoryId"), Index("name"), Index("isFavorite")]
 )
+@Immutable
 data class RecipeEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -54,6 +57,7 @@ data class RecipeEntity(
     ],
     indices = [Index("recipeId"), Index("name")]
 )
+@Immutable
 data class IngredientEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val recipeId: Long,
@@ -76,6 +80,7 @@ data class IngredientEntity(
     ],
     indices = [Index("recipeId")]
 )
+@Immutable
 data class StepEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val recipeId: Long,
@@ -85,6 +90,7 @@ data class StepEntity(
 )
 
 @Entity(tableName = "pantry_items")
+@Immutable
 data class PantryItemEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -106,6 +112,7 @@ data class PantryItemEntity(
     ],
     indices = [Index("recipeId"), Index("cookedAt")]
 )
+@Immutable
 data class CookHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val recipeId: Long,

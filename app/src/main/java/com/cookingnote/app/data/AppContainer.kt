@@ -3,6 +3,7 @@ package com.cookingnote.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.cookingnote.app.ai.AiService
 import com.cookingnote.app.ai.DefaultAiService
@@ -28,14 +29,16 @@ class AppContainer(context: Context) {
         override fun onCreate(db: SupportSQLiteDatabase) {
             super.onCreate(db)
             scope.launch {
-                SeedData.populate(
-                    categoryDao = database.categoryDao,
-                    recipeDao = database.recipeDao,
-                    ingredientDao = database.ingredientDao,
-                    stepDao = database.stepDao,
-                    tagDao = database.tagDao,
-                    pantryDao = database.pantryDao
-                )
+                database.withTransaction {
+                    SeedData.populate(
+                        categoryDao = database.categoryDao,
+                        recipeDao = database.recipeDao,
+                        ingredientDao = database.ingredientDao,
+                        stepDao = database.stepDao,
+                        tagDao = database.tagDao,
+                        pantryDao = database.pantryDao
+                    )
+                }
             }
         }
     }).build()

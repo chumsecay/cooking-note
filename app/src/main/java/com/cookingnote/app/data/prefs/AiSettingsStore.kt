@@ -9,13 +9,46 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
-enum class AiProviderType(val label: String, val defaultBaseUrl: String, val defaultModel: String) {
-    OPENAI_COMPATIBLE("OpenAI Compatible", "https://api.openai.com/v1/", "gpt-4o-mini"),
-    OPENAI("OpenAI", "https://api.openai.com/v1/", "gpt-4o-mini"),
-    OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1/", "openai/gpt-4o-mini"),
-    GEMINI("Gemini", "https://generativelanguage.googleapis.com/", "gemini-1.5-flash"),
-    ANTHROPIC("Anthropic", "https://api.anthropic.com/", "claude-3-5-haiku-latest"),
-    RULE_BASED("Rule-based (offline)", "", "")
+enum class AiProviderType(
+    val label: String,
+    val endpointPath: String?,
+    val defaultBaseUrl: String,
+    val defaultModel: String,
+    val requiresApiKey: Boolean
+) {
+    RULE_BASED("Rule-based (offline)", null, "", "", false),
+
+    OPENAI_CHAT(
+        "OpenAI Chat Completions (/v1/chat/completions)",
+        "/chat/completions",
+        "https://api.openai.com/v1/",
+        "gpt-4o-mini",
+        true
+    ),
+
+    OPENAI_RESPONSES(
+        "OpenAI Responses (/v1/responses)",
+        "/responses",
+        "https://api.openai.com/v1/",
+        "gpt-4o-mini",
+        true
+    ),
+
+    ANTHROPIC(
+        "Anthropic Messages (/v1/messages)",
+        "/v1/messages",
+        "https://api.anthropic.com/",
+        "claude-3-5-haiku-latest",
+        true
+    ),
+
+    GEMINI(
+        "Gemini Generate Content",
+        "/v1beta/models/{model}:generateContent",
+        "https://generativelanguage.googleapis.com/",
+        "gemini-1.5-flash",
+        true
+    )
 }
 
 data class AiSettings(
@@ -23,7 +56,7 @@ data class AiSettings(
     val baseUrl: String = "",
     val apiKey: String = "",
     val model: String = "",
-    val temperature: Float = 0.7f
+    val maxTokens: Int = 1500
 )
 
 class AiSettingsStore(context: Context) {
@@ -51,10 +84,12 @@ class AiSettingsStore(context: Context) {
             .getOrDefault(AiProviderType.RULE_BASED)
         return AiSettings(
             provider = provider,
-            baseUrl = prefs.getString(KEY_BASE_URL, provider.defaultBaseUrl).orEmpty(),
+            baseUrl = prefs.getString(KEY_BASE_URL, "").orEmpty()
+                .ifBlank { provider.defaultBaseUrl },
             apiKey = prefs.getString(KEY_API_KEY, "").orEmpty(),
-            model = prefs.getString(KEY_MODEL, provider.defaultModel).orEmpty(),
-            temperature = prefs.getFloat(KEY_TEMP, 0.7f)
+            model = prefs.getString(KEY_MODEL, "").orEmpty()
+                .ifBlank { provider.defaultModel },
+            maxTokens = prefs.getInt(KEY_MAX_TOKENS, 1500).coerceIn(256, 8192)
         )
     }
 
@@ -65,7 +100,7 @@ class AiSettingsStore(context: Context) {
             .putString(KEY_BASE_URL, next.baseUrl)
             .putString(KEY_API_KEY, next.apiKey)
             .putString(KEY_MODEL, next.model)
-            .putFloat(KEY_TEMP, next.temperature)
+            .putInt(KEY_MAX_TOKENS, next.maxTokens)
             .apply()
         _settings.value = next
     }
@@ -75,6 +110,6 @@ class AiSettingsStore(context: Context) {
         private const val KEY_BASE_URL = "base_url"
         private const val KEY_API_KEY = "api_key"
         private const val KEY_MODEL = "model"
-        private const val KEY_TEMP = "temperature"
+        private const val KEY_MAX_TOKENS = "max_tokens"
     }
 }
