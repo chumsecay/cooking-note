@@ -17,43 +17,94 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cookingnote.app.data.prefs.AiProviderType
-import com.cookingnote.app.data.prefs.AiSettings
 import com.cookingnote.app.ui.local.LocalAppContainer
-import kotlinx.coroutines.launch
-import java.io.File
+import com.cookingnote.app.ui.viewmodel.AppViewModelFactory
+import com.cookingnote.app.ui.viewmodel.SettingsUiState
+import com.cookingnote.app.ui.viewmodel.SettingsViewModel
+
+@Composable
+fun SettingsScreen(
+    modifier: Modifier = Modifier,
+    viewModel: SettingsViewModel = viewModel(
+        factory = AppViewModelFactory(LocalAppContainer.current)
+    )
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.saveSuccessMessage, uiState.errorMessage) {
+        val message = uiState.saveSuccessMessage ?: uiState.errorMessage
+        if (message != null) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearMessages()
+        }
+    }
+
+    SettingsContent(
+        uiState = uiState,
+        onProviderSelected = viewModel::onProviderSelected,
+        onBaseUrlChanged = viewModel::onBaseUrlChanged,
+        onApiKeyChanged = viewModel::onApiKeyChanged,
+        onModelChanged = viewModel::onModelChanged,
+        onMaxTokensChanged = viewModel::onMaxTokensChanged,
+        onDropdownExpandedChanged = viewModel::setProviderDropdownExpanded,
+        onSaveAiSettings = { viewModel.saveAiSettings() },
+        onBackupDatabase = {
+            viewModel.backupDatabase(context.cacheDir) { backupFile ->
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    backupFile
+                )
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/octet-stream"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "Backup database"))
+            }
+        },
+        snackbarHostState = snackbarHostState,
+        modifier = modifier
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
-    val container = LocalAppContainer.current
-    val settings by container.aiSettings.settings.collectAsState()
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-
-    var providerExpanded by remember { mutableStateOf(false) }
-    var baseUrl by remember(settings.provider) { mutableStateOf(settings.baseUrl) }
-    var apiKey by remember(settings.provider) { mutableStateOf(settings.apiKey) }
-    var model by remember(settings.provider) { mutableStateOf(settings.model) }
-    var maxTokens by remember(settings.provider) { mutableStateOf(settings.maxTokens.toString()) }
-
-    val keyRequired = settings.provider != AiProviderType.RULE_BASED &&
-        settings.provider.requiresApiKey
-
-    Scaffold(topBar = { TopAppBar(title = { Text("Cài đặt") }) }) { padding ->
+fun SettingsContent(
+    uiState: SettingsUiState,
+    onProviderSelected: (AiProviderType) -> Unit,
+    onBaseUrlChanged: (String) -> Unit,
+    onApiKeyChanged: (String) -> Unit,
+    onModelChanged: (String) -> Unit,
+    onMaxTokensChanged: (String) -> Unit,
+    onDropdownExpandedChanged: (Boolean) -> Unit,
+    onSaveAiSettings: () -> Unit,
+    onBackupDatabase: () -> Unit,
+    snackbarHostState: SnackbarHostState? = null,
+    modifier: Modifier = Modifier
+) {
+    Scaffold(
+        modifier = modifier,
+        topBar = { TopAppBar(title = { Text("Cài đặt") }) },
+        snackbarHost = { snackbarHostState?.let { SnackbarHost(it) } }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -65,121 +116,86 @@ fun SettingsScreen() {
             Text("AI Provider", style = MaterialTheme.typography.titleLarge)
 
             ExposedDropdownMenuBox(
-                expanded = providerExpanded,
-                onExpandedChange = { providerExpanded = it }
+                expanded = uiState.isProviderDropdownExpanded,
+                onExpandedChange = onDropdownExpandedChanged
             ) {
                 OutlinedTextField(
-                    value = settings.provider.label,
+                    value = uiState.provider.label,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Provider / Endpoint chuẩn") },
                     trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(providerExpanded)
+                        ExposedDropdownMenuDefaults.TrailingIcon(uiState.isProviderDropdownExpanded)
                     },
                     modifier = Modifier
                         .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         .fillMaxWidth()
                 )
                 ExposedDropdownMenu(
-                    expanded = providerExpanded,
-                    onDismissRequest = { providerExpanded = false }
+                    expanded = uiState.isProviderDropdownExpanded,
+                    onDismissRequest = { onDropdownExpandedChanged(false) }
                 ) {
                     AiProviderType.entries.forEach { type ->
                         DropdownMenuItem(
                             text = { Text(type.label) },
-                            onClick = {
-                                providerExpanded = false
-                                scope.launch {
-                                    container.aiSettings.update { current ->
-                                        current.copy(
-                                            provider = type,
-                                            baseUrl = type.defaultBaseUrl,
-                                            model = type.defaultModel
-                                        )
-                                    }
-                                    baseUrl = type.defaultBaseUrl
-                                    model = type.defaultModel
-                                }
-                            }
+                            onClick = { onProviderSelected(type) }
                         )
                     }
                 }
             }
 
             Text(
-                "Endpoint sẽ gọi: ${endpointSummary(settings.provider)}",
+                "Endpoint sẽ gọi: ${uiState.endpointSummary}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             OutlinedTextField(
-                value = baseUrl,
-                onValueChange = { baseUrl = it },
+                value = uiState.baseUrl,
+                onValueChange = onBaseUrlChanged,
                 label = { Text("Base URL") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = keyRequired
+                enabled = uiState.isKeyRequired && !uiState.isSaving
             )
             OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
+                value = uiState.apiKey,
+                onValueChange = onApiKeyChanged,
                 label = { Text("API Key") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = keyRequired
+                enabled = uiState.isKeyRequired && !uiState.isSaving
             )
             OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
+                value = uiState.model,
+                onValueChange = onModelChanged,
                 label = { Text("Model") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = keyRequired
+                enabled = uiState.isKeyRequired && !uiState.isSaving
             )
             OutlinedTextField(
-                value = maxTokens,
-                onValueChange = { v -> maxTokens = v.filter(Char::isDigit).take(5) },
+                value = uiState.maxTokens,
+                onValueChange = onMaxTokensChanged,
                 label = { Text("max_tokens (256 – 8192)") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = keyRequired,
+                enabled = uiState.isKeyRequired && !uiState.isSaving,
                 singleLine = true
             )
 
             Button(
-                onClick = {
-                    scope.launch {
-                        container.aiSettings.update {
-                            it.copy(
-                                baseUrl = baseUrl.trim(),
-                                apiKey = apiKey.trim(),
-                                model = model.trim(),
-                                maxTokens = maxTokens.toIntOrNull()
-                                    ?.coerceIn(256, 8192) ?: 1500
-                            )
-                        }
-                    }
-                },
+                onClick = onSaveAiSettings,
+                enabled = !uiState.isSaving,
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Lưu cấu hình AI") }
+            ) {
+                Text(if (uiState.isSaving) "Đang lưu…" else "Lưu cấu hình AI")
+            }
 
             Text("Dữ liệu", style = MaterialTheme.typography.titleLarge)
             Button(
-                onClick = {
-                    val db = container.databaseFile()
-                    if (!db.exists()) return@Button
-                    val cacheCopy = File(context.cacheDir, "cookingnote-backup.db")
-                    db.copyTo(cacheCopy, overwrite = true)
-                    val uri = FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        cacheCopy
-                    )
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = "application/octet-stream"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    context.startActivity(Intent.createChooser(intent, "Backup database"))
-                },
+                onClick = onBackupDatabase,
+                enabled = !uiState.isBackingUp,
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Backup SQLite") }
+            ) {
+                Text(if (uiState.isBackingUp) "Đang sao lưu…" else "Backup SQLite")
+            }
 
             Text(
                 "App: Sổ tay Nấu ăn · Kotlin + Compose + Room · " +
@@ -189,12 +205,4 @@ fun SettingsScreen() {
             )
         }
     }
-}
-
-private fun endpointSummary(p: AiProviderType): String = when (p) {
-    AiProviderType.RULE_BASED -> "Không gọi mạng (dùng thư viện cục bộ)."
-    AiProviderType.OPENAI_CHAT -> "POST {baseUrl}/chat/completions (OpenAI-compatible)"
-    AiProviderType.OPENAI_RESPONSES -> "POST {baseUrl}/responses (OpenAI Responses)"
-    AiProviderType.ANTHROPIC -> "POST {baseUrl}/v1/messages (Anthropic)"
-    AiProviderType.GEMINI -> "POST {baseUrl}/v1beta/models/{model}:generateContent?key=..."
 }

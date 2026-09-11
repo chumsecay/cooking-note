@@ -1,7 +1,7 @@
 package com.cookingnote.app.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -35,71 +36,70 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cookingnote.app.data.entity.ChatMessageEntity
-import com.cookingnote.app.data.entity.PantryItemEntity
 import com.cookingnote.app.ui.local.LocalAppContainer
-import kotlinx.coroutines.launch
+import com.cookingnote.app.ui.viewmodel.AiUiState
+import com.cookingnote.app.ui.viewmodel.AiViewModel
+import com.cookingnote.app.ui.viewmodel.AppViewModelFactory
+import com.cookingnote.app.ui.viewmodel.PromptSuggestion
+import com.cookingnote.app.ui.viewmodel.SuggestionType
 
-private data class QuickChip(
-    val label: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val prompt: String
-)
-
-private val quickChips = listOf(
-    QuickChip("Từ tủ lạnh", Icons.Filled.Kitchen,
-        "Dựa trên tủ lạnh hiện tại, gợi ý 3 món tôi có thể nấu ngay. Mỗi món 2-3 dòng."),
-    QuickChip("Món nhanh 15 phút", Icons.Filled.Timer,
-        "Gợi ý 5 món Việt nấu trong 15 phút, đơn giản, nguyên liệu dễ mua."),
-    QuickChip("Món chay", Icons.Filled.Eco,
-        "Gợi ý 5 món chay ngon, dễ nấu, phù hợp bữa cơm gia đình."),
-    QuickChip("Món cay", Icons.Filled.LocalFireDepartment,
-        "Gợi ý 5 món Việt cay, có thể làm tại nhà, kèm nguyên liệu chính.")
-)
+@Composable
+fun AiScreen(
+    onOpenRecipe: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: AiViewModel = viewModel(
+        factory = AppViewModelFactory(LocalAppContainer.current)
+    )
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    AiContent(
+        uiState = uiState,
+        onSendMessage = viewModel::sendMessage,
+        onSendSuggestion = viewModel::sendSuggestion,
+        onClearChat = viewModel::clearChat,
+        onOpenRecipe = onOpenRecipe,
+        modifier = modifier
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AiScreen(onOpenRecipe: (Long) -> Unit) {
-    val container = LocalAppContainer.current
-    val settings by container.aiSettings.settings.collectAsState()
-    val messages by container.repository.observeChat()
-        .collectAsState(emptyList())
-    val pantry by container.repository.observePantry()
-        .collectAsState(emptyList())
-    val scope = rememberCoroutineScope()
+fun AiContent(
+    uiState: AiUiState,
+    onSendMessage: (String) -> Unit,
+    onSendSuggestion: (PromptSuggestion) -> Unit,
+    onClearChat: () -> Unit,
+    onOpenRecipe: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val listState = rememberLazyListState()
-
     var input by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
 
-    val isCloud = container.aiService.isCloudConfigured
-    val keyRequired = settings.provider != com.cookingnote.app.data.prefs.AiProviderType.RULE_BASED &&
-        settings.provider.requiresApiKey
-
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex)
+    LaunchedEffect(uiState.messages.size) {
+        if (uiState.messages.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.messages.lastIndex)
         }
     }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text("Trợ lý nấu ăn") },
                 actions = {
                     IconButton(
-                        onClick = { scope.launch { container.repository.clearChat() } },
-                        enabled = messages.isNotEmpty()
+                        onClick = onClearChat,
+                        enabled = uiState.messages.isNotEmpty() && !uiState.isBusy
                     ) {
                         Icon(Icons.Filled.Delete, contentDescription = "Xóa lịch sử")
                     }
@@ -112,34 +112,48 @@ fun AiScreen(onOpenRecipe: (Long) -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (!isCloud && keyRequired) {
-                StatusBanner("AI chưa cấu hình. Vào Cài đặt → chọn provider → nhập API key.")
-            } else if (!isCloud) {
-                StatusBanner("Đang dùng gợi ý cục bộ (rule-based).")
-            } else {
-                StatusBanner("Đã nhớ: ${messages.size} tin nhắn · AI thấy tủ lạnh: ${pantry.size} món.")
+            StatusBanner(uiState.statusBannerText)
+
+            if (uiState.errorMessage != null && !uiState.isBusy) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = uiState.errorMessage,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
             }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                quickChips.forEach { chip ->
+                uiState.suggestions.forEach { suggestion ->
+                    val icon = when (suggestion.type) {
+                        SuggestionType.FROM_PANTRY -> Icons.Filled.Kitchen
+                        SuggestionType.QUICK_MEAL -> Icons.Filled.Timer
+                        SuggestionType.VEGETARIAN -> Icons.Filled.Eco
+                        SuggestionType.SPICY -> Icons.Filled.LocalFireDepartment
+                    }
                     AssistChip(
-                        onClick = {
-                            input = chip.prompt
-                            scope.launch { sendToAi(container, chip.prompt, messages, onBusy = { busy = it }) }
-                        },
-                        label = { Text(chip.label, style = MaterialTheme.typography.labelSmall) },
+                        onClick = { onSendSuggestion(suggestion) },
+                        label = { Text(suggestion.label, style = MaterialTheme.typography.labelSmall) },
                         leadingIcon = {
                             Icon(
-                                chip.icon,
+                                icon,
                                 contentDescription = null,
                                 modifier = Modifier.padding(2.dp)
                             )
                         },
+                        enabled = !uiState.isBusy,
                         colors = AssistChipDefaults.assistChipColors()
                     )
                 }
@@ -153,16 +167,16 @@ fun AiScreen(onOpenRecipe: (Long) -> Unit) {
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (messages.isEmpty()) {
+                if (uiState.messages.isEmpty()) {
                     item { EmptyState() }
                 }
-                items(messages, key = { it.id }) { msg ->
+                items(uiState.messages, key = { it.id }) { msg ->
                     MessageBubble(
                         message = msg,
                         onOpenRecipe = onOpenRecipe
                     )
                 }
-                if (busy) {
+                if (uiState.isBusy) {
                     item { TypingBubble() }
                 }
             }
@@ -179,22 +193,16 @@ fun AiScreen(onOpenRecipe: (Long) -> Unit) {
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Hỏi trợ lý…") },
-                    enabled = !busy,
+                    enabled = !uiState.isBusy,
                     maxLines = 4
                 )
                 IconButton(
-                    enabled = !busy && input.isNotBlank(),
+                    enabled = !uiState.isBusy && input.isNotBlank(),
                     onClick = {
                         val text = input.trim()
-                        input = ""
-                        scope.launch {
-                            sendToAi(
-                                container,
-                                text,
-                                messages,
-                                onBusy = { busy = it },
-                                onUserSend = { container.repository.appendMessage("user", it) }
-                            )
+                        if (text.isNotBlank()) {
+                            onSendMessage(text)
+                            input = ""
                         }
                     }
                 ) {
@@ -202,32 +210,6 @@ fun AiScreen(onOpenRecipe: (Long) -> Unit) {
                 }
             }
         }
-    }
-}
-
-private suspend fun sendToAi(
-    container: com.cookingnote.app.data.AppContainer,
-    prompt: String,
-    current: List<ChatMessageEntity>,
-    onBusy: (Boolean) -> Unit,
-    onUserSend: (suspend (String) -> Unit)? = null
-) {
-    onBusy(true)
-    try {
-        if (onUserSend != null) onUserSend(prompt)
-        val history = current.takeLast(20).map { it.role to it.content }
-        val suggestion = container.aiService.chat(prompt, history)
-        container.repository.appendMessage(
-            "assistant",
-            suggestion.detail ?: suggestion.summary
-        )
-    } catch (e: Exception) {
-        container.repository.appendMessage(
-            "assistant",
-            "Lỗi: ${e.message ?: "không xác định"}"
-        )
-    } finally {
-        onBusy(false)
     }
 }
 
@@ -310,7 +292,6 @@ private fun MessageBubble(message: ChatMessageEntity, onOpenRecipe: (Long) -> Un
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
         )
     }
-    // Placeholder hook for tapping recipes (kept for future expansion)
     @Suppress("UNUSED_PARAMETER") val hint = onOpenRecipe
 }
 
@@ -331,6 +312,3 @@ private fun TypingBubble() {
         )
     }
 }
-
-@Suppress("unused")
-private fun unused(p: List<PantryItemEntity>) = p.size

@@ -13,6 +13,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "DefaultAiService"
@@ -210,7 +211,7 @@ class DefaultAiService(
     ): AiRaw {
         val url = settings.baseUrl.trimEnd('/') + "/chat/completions"
         val dataUrl = "data:image/jpeg;base64," +
-            android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
+            Base64.getEncoder().encodeToString(imageBytes)
         val body = """
             {
               "model": "${settings.model}",
@@ -282,7 +283,7 @@ class DefaultAiService(
     ): AiRaw {
         val url = settings.baseUrl.trimEnd('/') + "/responses"
         val dataUrl = "data:image/jpeg;base64," +
-            android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
+            Base64.getEncoder().encodeToString(imageBytes)
         val body = """
             {
               "model": "${settings.model}",
@@ -401,7 +402,7 @@ class DefaultAiService(
     ): AiRaw {
         val model = settings.model.ifBlank { "gemini-1.5-flash" }
         val url = "${settings.baseUrl.trimEnd('/')}/v1beta/models/$model:generateContent?key=${settings.apiKey}"
-        val b64 = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
+        val b64 = Base64.getEncoder().encodeToString(imageBytes)
         val body = """
             {
               "contents":[{

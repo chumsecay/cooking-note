@@ -47,6 +47,8 @@ Desktop.ini
 
 # ZCode / agent local
 .zcode/
+.agents/
+.mimosa/
 
 # Logs & temp
 *.log

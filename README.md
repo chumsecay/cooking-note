@@ -133,7 +133,28 @@ Lần mở đầu tiên app tự seed 9 recipes Việt (Canh chua, Mì xào bò,
 
 ## 📸 Screenshots
 
-_(thêm ảnh sau khi chạy thật trên thiết bị)_
+**Chat AI interface** (sau khi tap chip "Món nhanh 15 phút" và "Món chay"):
+![Chat UI](https://github.com/chumsecay/cooking-note/raw/main/chat-ui-example.png)
+
+**Recipe detail card** in AI response:
+- **Cơm chiên trứng cà chua** (35 phút)
+  Gạo, trứng, cà chua đều có. Hành tím thơm, trứng đánh sẵn, com rang, nêm nước mắm + đường.
+
+- **Canh chua trứng kho**
+  Trứng bò mù, xào tỏi, đặt trứng vào khòa nhỏ. Nước mắm + đường. Ăn với com trắng.
+
+- **Trứng chiên hành tỏi**
+  Trứng đánh với hành tím + tỏi băm, chiên vàng. Đầu ăn để chấm nước mắm đường.
+
+**Món yêu thích gần đây**: Gỏi cuốn, bún chả, phở bò… (cần thịt, rau sống, bún – tủ lạnh thiếu. Đi chợ bổ sung nếu muốn).
+
+---
+
+## 📖 Documentation
+
+- Full features, stack, AI config, Room schema, build instructions in `README.md`.
+- Report slides and docx to be generated in Phase 5.
+
 
 ---
 
