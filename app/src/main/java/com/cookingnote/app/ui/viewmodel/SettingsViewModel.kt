@@ -2,6 +2,7 @@ package com.cookingnote.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cookingnote.app.data.prefs.AiCloudDefaults
 import com.cookingnote.app.data.prefs.AiProviderType
 import com.cookingnote.app.data.prefs.AiSettings
 import com.cookingnote.app.data.prefs.AiSettingsStore
@@ -25,6 +26,7 @@ data class SettingsUiState(
     val model: String = "",
     val maxTokens: String = "1500",
     val isProviderDropdownExpanded: Boolean = false,
+    val isAdvancedExpanded: Boolean = false,
     val isSaving: Boolean = false,
     val saveSuccessMessage: String? = null,
     val isBackingUp: Boolean = false,
@@ -33,6 +35,10 @@ data class SettingsUiState(
 ) {
     val isKeyRequired: Boolean
         get() = provider != AiProviderType.RULE_BASED && provider.requiresApiKey
+
+    // Chế độ đơn giản cho production: chỉ phân biệt offline vs cloud.
+    val isCloudEnabled: Boolean
+        get() = provider != AiProviderType.RULE_BASED
 
     val endpointSummary: String
         get() = when (provider) {
@@ -81,8 +87,8 @@ class SettingsViewModel(
         _uiState.update {
             it.copy(
                 provider = provider,
-                baseUrl = provider.defaultBaseUrl,
-                model = provider.defaultModel,
+                baseUrl = AiCloudDefaults.baseUrlFor(provider),
+                model = AiCloudDefaults.modelFor(provider),
                 isProviderDropdownExpanded = false
             )
         }
@@ -90,8 +96,8 @@ class SettingsViewModel(
             aiSettingsStore.update { current ->
                 current.copy(
                     provider = provider,
-                    baseUrl = provider.defaultBaseUrl,
-                    model = provider.defaultModel
+                    baseUrl = AiCloudDefaults.baseUrlFor(provider),
+                    model = AiCloudDefaults.modelFor(provider)
                 )
             }
         }
@@ -120,6 +126,27 @@ class SettingsViewModel(
 
     fun setProviderDropdownExpanded(expanded: Boolean) {
         _uiState.update { it.copy(isProviderDropdownExpanded = expanded) }
+    }
+
+    fun setAdvancedExpanded(expanded: Boolean) {
+        _uiState.update { it.copy(isAdvancedExpanded = expanded) }
+    }
+
+    /**
+     * Chế độ đơn giản cho production: bật/tắt AI đám mây mà không cần
+     * hiện custom provider. Khi bật dùng provider cấu hình sẵn trong
+     * [AiCloudDefaults]; muốn đổi provider khác thì mở phần nâng cao
+     * (xem SettingsScreen.SHOW_CUSTOM_PROVIDER_UI) hoặc đổi từ xa qua
+     * [AiCloudDefaults.REMOTE_CONFIG_URL].
+     */
+    fun onCloudEnabledChanged(enabled: Boolean) {
+        val current = _uiState.value
+        if (enabled == current.isCloudEnabled) return
+        if (enabled) {
+            onProviderSelected(AiCloudDefaults.CLOUD_PROVIDER)
+        } else {
+            onProviderSelected(AiProviderType.RULE_BASED)
+        }
     }
 
     /**

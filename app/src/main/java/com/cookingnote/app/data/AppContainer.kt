@@ -8,6 +8,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.cookingnote.app.ai.AiService
 import com.cookingnote.app.ai.DefaultAiService
 import com.cookingnote.app.data.database.AppDatabase
+import com.cookingnote.app.data.prefs.AiCloudDefaults
+import com.cookingnote.app.data.prefs.AiRemoteConfig
 import com.cookingnote.app.data.prefs.AiSettingsStore
 import com.cookingnote.app.data.prefs.UserPrefsStore
 import com.cookingnote.app.data.repository.CookbookRepository
@@ -68,4 +70,25 @@ class AppContainer(context: Context) {
 
     fun databaseFile(): java.io.File =
         appContext.getDatabasePath(AppDatabase.DB_NAME)
+
+    init {
+        refreshCloudConfig()
+    }
+
+    /**
+     * Tải cấu hình AI từ xa (nếu bật trong [AiCloudDefaults]) rồi merge vào
+     * [aiSettings]. Chạy fire-and-forget: offline-first, mất mạng thì giữ
+     * nguyên cấu hình sẵn trong code. JSON remote không bao giờ chứa API key.
+     */
+    private fun refreshCloudConfig() {
+        if (!AiCloudDefaults.REMOTE_ENABLED) return
+        val url = AiCloudDefaults.REMOTE_CONFIG_URL
+        if (url.isBlank()) return
+        scope.launch {
+            val remote = AiRemoteConfig.fetch(url)
+            if (remote != null) {
+                runCatching { aiSettings.applyRemoteConfig(remote) }
+            }
+        }
+    }
 }

@@ -85,11 +85,12 @@ class AiSettingsStore(context: Context) {
         return AiSettings(
             provider = provider,
             baseUrl = prefs.getString(KEY_BASE_URL, "").orEmpty()
-                .ifBlank { provider.defaultBaseUrl },
+                .ifBlank { AiCloudDefaults.baseUrlFor(provider) },
             apiKey = prefs.getString(KEY_API_KEY, "").orEmpty(),
             model = prefs.getString(KEY_MODEL, "").orEmpty()
-                .ifBlank { provider.defaultModel },
-            maxTokens = prefs.getInt(KEY_MAX_TOKENS, 1500).coerceIn(256, 8192)
+                .ifBlank { AiCloudDefaults.modelFor(provider) },
+            maxTokens = prefs.getInt(KEY_MAX_TOKENS, AiCloudDefaults.CLOUD_MAX_TOKENS)
+                .coerceIn(256, 8192)
         )
     }
 
@@ -103,6 +104,29 @@ class AiSettingsStore(context: Context) {
             .putInt(KEY_MAX_TOKENS, next.maxTokens)
             .apply()
         _settings.value = next
+    }
+
+    /**
+     * Merge cấu hình từ xa vào store. Chỉ đụng provider/baseUrl/model/maxTokens,
+     * KHÔNG bao giờ đụng apiKey. Trường nào remote thiếu thì giữ giá trị cũ.
+     * [AiRemoteConfig.forceOffline] ép toàn bộ máy về offline (công tắc khẩn cấp).
+     */
+    suspend fun applyRemoteConfig(remote: AiRemoteConfig) {
+        if (remote.forceOffline) {
+            update { it.copy(provider = AiProviderType.RULE_BASED) }
+            return
+        }
+        update { current ->
+            val provider = remote.provider ?: current.provider
+            current.copy(
+                provider = provider,
+                baseUrl = remote.baseUrl ?: current.baseUrl
+                    .ifBlank { AiCloudDefaults.baseUrlFor(provider) },
+                model = remote.model ?: current.model
+                    .ifBlank { AiCloudDefaults.modelFor(provider) },
+                maxTokens = remote.maxTokens ?: current.maxTokens
+            )
+        }
     }
 
     companion object {
