@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cookingnote.app.data.dao.RecipeStats
 import com.cookingnote.app.data.entity.RecipeEntity
+import com.cookingnote.app.data.remote.model.SyncStatus
 import com.cookingnote.app.data.repository.CookbookRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -16,12 +18,15 @@ import kotlinx.coroutines.launch
  * UI State representation for the Home screen.
  */
 sealed interface HomeUiState {
+    val syncStatus: SyncStatus get() = SyncStatus.Synced
+
     data object Loading : HomeUiState
     data object Empty : HomeUiState
     data class Content(
         val stats: RecipeStats,
         val todaysPicks: List<RecipeEntity>,
-        val favorites: List<RecipeEntity>
+        val favorites: List<RecipeEntity>,
+        override val syncStatus: SyncStatus = SyncStatus.Synced
     ) : HomeUiState
     data class Error(val message: String) : HomeUiState
 }
@@ -36,15 +41,17 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = combine(
         repository.observeStats(),
         repository.observeTodaysPick(3),
-        repository.observeFavorites()
-    ) { stats, todaysPicks, favorites ->
+        repository.observeFavorites(),
+        repository.observeSyncStatus().onStart { emit(SyncStatus.Synced) }
+    ) { stats, todaysPicks, favorites, syncStatus ->
         if (stats.total == 0 && todaysPicks.isEmpty() && favorites.isEmpty()) {
             HomeUiState.Empty
         } else {
             HomeUiState.Content(
                 stats = stats,
                 todaysPicks = todaysPicks,
-                favorites = favorites
+                favorites = favorites,
+                syncStatus = syncStatus
             )
         }
     }

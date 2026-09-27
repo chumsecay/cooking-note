@@ -105,7 +105,8 @@ class Milestone3ChallengerAdversarialTest {
             "Route.Search.path",
             "Route.Create.path",
             "Route.Detail.path",
-            "Route.Edit.path"
+            "Route.Edit.path",
+            "Route.Auth.path"
         )
 
         for (route in expectedRoutes) {
@@ -127,7 +128,8 @@ class Milestone3ChallengerAdversarialTest {
             "HistoryViewModel",
             "SearchViewModel",
             "CreateRecipeViewModel",
-            "DetailViewModel"
+            "DetailViewModel",
+            "AuthViewModel"
         )
 
         for (vm in expectedVms) {
@@ -152,10 +154,11 @@ class Milestone3ChallengerAdversarialTest {
             SearchViewModel::class.java to factoryWithId.create(SearchViewModel::class.java),
             SettingsViewModel::class.java to factoryWithId.create(SettingsViewModel::class.java),
             AiViewModel::class.java to factoryWithId.create(AiViewModel::class.java),
-            CreateRecipeViewModel::class.java to factoryWithId.create(CreateRecipeViewModel::class.java)
+            CreateRecipeViewModel::class.java to factoryWithId.create(CreateRecipeViewModel::class.java),
+            com.cookingnote.app.ui.viewmodel.AuthViewModel::class.java to factoryWithId.create(com.cookingnote.app.ui.viewmodel.AuthViewModel::class.java)
         )
 
-        assertEquals("Must resolve all 10 registered ViewModel classes", 10, vmMap.size)
+        assertEquals("Must resolve all 11 registered ViewModel classes", 11, vmMap.size)
         vmMap.forEach { (clazz, instance) ->
             assertTrue("Instance must match requested type ${clazz.simpleName}", clazz.isInstance(instance))
         }

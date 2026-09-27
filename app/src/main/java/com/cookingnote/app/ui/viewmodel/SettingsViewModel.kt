@@ -25,9 +25,13 @@ data class SettingsUiState(
     val apiKey: String = "",
     val model: String = "",
     val maxTokens: String = "1500",
+    val isCustomEndpoint: Boolean = false,
     val isProviderDropdownExpanded: Boolean = false,
     val isAdvancedExpanded: Boolean = false,
     val isSaving: Boolean = false,
+    val isTestingConnection: Boolean = false,
+    val testConnectionResult: String? = null,
+    val isTestSuccess: Boolean? = null,
     val saveSuccessMessage: String? = null,
     val isBackingUp: Boolean = false,
     val backupSuccessFile: File? = null,
@@ -56,7 +60,8 @@ data class SettingsUiState(
 class SettingsViewModel(
     private val aiSettingsStore: AiSettingsStore,
     private val databaseFile: File,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val aiService: com.cookingnote.app.ai.AiService? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -74,11 +79,47 @@ class SettingsViewModel(
                             baseUrl = settings.baseUrl,
                             apiKey = settings.apiKey,
                             model = settings.model,
-                            maxTokens = settings.maxTokens.toString()
+                            maxTokens = settings.maxTokens.toString(),
+                            isCustomEndpoint = settings.isCustom
                         )
                     }
                 }
             }
+        }
+    }
+
+    fun onCustomEndpointToggled(isCustom: Boolean) {
+        if (!isCustom) {
+            onUsePresetCloudSelected()
+        } else {
+            isFormDirty = true
+            _uiState.update { it.copy(isCustomEndpoint = true) }
+        }
+    }
+
+    fun onUsePresetCloudSelected() {
+        isFormDirty = true
+        _uiState.update {
+            it.copy(
+                isCustomEndpoint = false,
+                provider = AiCloudDefaults.CLOUD_PROVIDER,
+                baseUrl = AiCloudDefaults.CLOUD_BASE_URL,
+                model = AiCloudDefaults.CLOUD_MODEL,
+                apiKey = AiCloudDefaults.CLOUD_API_KEY,
+                maxTokens = AiCloudDefaults.CLOUD_MAX_TOKENS.toString()
+            )
+        }
+        viewModelScope.launch(ioDispatcher) {
+            aiSettingsStore.update {
+                it.copy(
+                    provider = AiCloudDefaults.CLOUD_PROVIDER,
+                    baseUrl = AiCloudDefaults.CLOUD_BASE_URL,
+                    model = AiCloudDefaults.CLOUD_MODEL,
+                    apiKey = AiCloudDefaults.CLOUD_API_KEY,
+                    maxTokens = AiCloudDefaults.CLOUD_MAX_TOKENS
+                )
+            }
+            isFormDirty = false
         }
     }
 
@@ -89,7 +130,8 @@ class SettingsViewModel(
                 provider = provider,
                 baseUrl = AiCloudDefaults.baseUrlFor(provider),
                 model = AiCloudDefaults.modelFor(provider),
-                isProviderDropdownExpanded = false
+                isProviderDropdownExpanded = false,
+                isCustomEndpoint = true
             )
         }
         viewModelScope.launch(ioDispatcher) {
@@ -105,7 +147,7 @@ class SettingsViewModel(
 
     fun onBaseUrlChanged(baseUrl: String) {
         isFormDirty = true
-        _uiState.update { it.copy(baseUrl = baseUrl) }
+        _uiState.update { it.copy(baseUrl = baseUrl, isCustomEndpoint = true) }
     }
 
     fun onApiKeyChanged(apiKey: String) {
@@ -115,7 +157,7 @@ class SettingsViewModel(
 
     fun onModelChanged(model: String) {
         isFormDirty = true
-        _uiState.update { it.copy(model = model) }
+        _uiState.update { it.copy(model = model, isCustomEndpoint = true) }
     }
 
     fun onMaxTokensChanged(maxTokens: String) {
@@ -132,13 +174,6 @@ class SettingsViewModel(
         _uiState.update { it.copy(isAdvancedExpanded = expanded) }
     }
 
-    /**
-     * Chế độ đơn giản cho production: bật/tắt AI đám mây mà không cần
-     * hiện custom provider. Khi bật dùng provider cấu hình sẵn trong
-     * [AiCloudDefaults]; muốn đổi provider khác thì mở phần nâng cao
-     * (xem SettingsScreen.SHOW_CUSTOM_PROVIDER_UI) hoặc đổi từ xa qua
-     * [AiCloudDefaults.REMOTE_CONFIG_URL].
-     */
     fun onCloudEnabledChanged(enabled: Boolean) {
         val current = _uiState.value
         if (enabled == current.isCloudEnabled) return
@@ -157,14 +192,15 @@ class SettingsViewModel(
             _uiState.update { it.copy(isSaving = true, errorMessage = null, saveSuccessMessage = null) }
             try {
                 val current = _uiState.value
-                val tokens = current.maxTokens.toIntOrNull()?.coerceIn(256, 8192) ?: 1500
+                val tokens = current.maxTokens.toIntOrNull()?.coerceIn(0, 32768) ?: 0
                 aiSettingsStore.update {
                     it.copy(
                         provider = current.provider,
                         baseUrl = current.baseUrl.trim(),
                         apiKey = current.apiKey.trim(),
                         model = current.model.trim(),
-                        maxTokens = tokens
+                        maxTokens = tokens,
+                        isCustom = current.isCustomEndpoint
                     )
                 }
                 isFormDirty = false
@@ -181,6 +217,56 @@ class SettingsViewModel(
                     it.copy(
                         isSaving = false,
                         errorMessage = "Lỗi khi lưu cấu hình: ${e.message ?: "không xác định"}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Gửi yêu cầu kiểm tra kết nối AI đến service hiện tại để kiểm tra tính khả dụng.
+     */
+    fun testAiConnection() {
+        if (_uiState.value.isTestingConnection) return
+        viewModelScope.launch(ioDispatcher) {
+            _uiState.update {
+                it.copy(
+                    isTestingConnection = true,
+                    errorMessage = null,
+                    saveSuccessMessage = null,
+                    testConnectionResult = null,
+                    isTestSuccess = null
+                )
+            }
+            try {
+                if (aiService == null) {
+                    _uiState.update {
+                        it.copy(
+                            isTestingConnection = false,
+                            isTestSuccess = false,
+                            testConnectionResult = "Dịch vụ AI chưa sẵn sàng.",
+                            errorMessage = "Dịch vụ AI chưa sẵn sàng."
+                        )
+                    }
+                    return@launch
+                }
+                val reply = aiService.testConnection()
+                _uiState.update {
+                    it.copy(
+                        isTestingConnection = false,
+                        isTestSuccess = true,
+                        testConnectionResult = reply,
+                        saveSuccessMessage = "Kết nối thành công!"
+                    )
+                }
+            } catch (e: Exception) {
+                val errorMsg = e.message ?: "Lỗi không xác định"
+                _uiState.update {
+                    it.copy(
+                        isTestingConnection = false,
+                        isTestSuccess = false,
+                        testConnectionResult = "Thất bại: $errorMsg",
+                        errorMessage = "Kiểm tra kết nối thất bại: $errorMsg"
                     )
                 }
             }

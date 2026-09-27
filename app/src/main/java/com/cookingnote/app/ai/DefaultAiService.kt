@@ -66,25 +66,56 @@ class DefaultAiService(
         }
     }
 
+    override suspend fun testConnection(): String = withContext(Dispatchers.IO) {
+        val settings = settingsStore.settings.value
+        if (settings.provider == AiProviderType.RULE_BASED) {
+            return@withContext "Chế độ Rule-based (Cục bộ): Không sử dụng kết nối mạng."
+        }
+        if (settings.apiKey.isBlank() && settings.provider.requiresApiKey) {
+            throw IOException("Chưa nhập API Key cho ${settings.provider.label}.")
+        }
+        val raw = when (settings.provider) {
+            AiProviderType.OPENAI_CHAT -> callChatCompletions(settings, "Xin chào, phản hồi ngắn gọn 1 câu để xác nhận kết nối.", emptyList(), null)
+            AiProviderType.OPENAI_RESPONSES -> callResponses(settings, "Xin chào, phản hồi ngắn gọn 1 câu để xác nhận kết nối.", emptyList(), null)
+            AiProviderType.ANTHROPIC -> callAnthropic(settings, "Xin chào, phản hồi ngắn gọn 1 câu để xác nhận kết nối.", emptyList(), null)
+            AiProviderType.GEMINI -> callGeminiText(settings, "Xin chào, phản hồi ngắn gọn 1 câu để xác nhận kết nối.", emptyList(), null)
+            AiProviderType.RULE_BASED -> unreachable()
+        }
+        val reply = raw.text.ifBlank { raw.reasoning }.orEmpty().trim()
+        if (reply.isBlank()) {
+            throw IOException("Máy chủ trả về phản hồi rỗng (finish: ${raw.finish}).")
+        }
+        "Kết nối thành công tới ${settings.provider.label}!\nModel: ${raw.model.ifBlank { settings.model }}\nPhản hồi: \"$reply\""
+    }
+
     private suspend fun buildSystemContext(): String {
         val pantry = repository.observePantry().first()
         val favorites = repository.recentFavorites(5)
         val recent = repository.recentCooked(3)
         val sb = StringBuilder()
-        sb.appendLine("[Ngữ cảnh người dùng]")
+        sb.appendLine("Bạn là trợ lý ẩm thực thông minh và thân thiện của ứng dụng Cooking Note.")
+        sb.appendLine("Nhiệm vụ của bạn là đồng hành, tư vấn thực đơn, chia sẻ công thức và mẹo nấu ăn ngon cho người dùng bằng tiếng Việt.")
+        sb.appendLine()
+        sb.appendLine("=== THÔNG TIN NGỮ CẢNH CỦA NGƯỜI DÙNG ===")
         if (pantry.isNotEmpty()) {
-            sb.appendLine("Tủ lạnh hiện có:")
-            pantry.forEach { sb.appendLine("- ${it.name}: ${it.amount} ${it.unit}") }
+            sb.appendLine("• Tủ lạnh hiện có (${pantry.size} món):")
+            pantry.forEach { sb.appendLine("  - ${it.name}: ${it.amount} ${it.unit}") }
+        } else {
+            sb.appendLine("• Tủ lạnh: Hiện chưa có nguyên liệu nào được lưu.")
         }
         if (favorites.isNotEmpty()) {
-            sb.appendLine("Món yêu thích gần đây:")
-            favorites.forEach { sb.appendLine("- ${it.name}") }
+            sb.appendLine("• Món yêu thích gần đây: ${favorites.joinToString(", ") { it.name }}")
         }
         if (recent.isNotEmpty()) {
-            sb.appendLine("Món đã nấu gần đây:")
-            recent.forEach { sb.appendLine("- ${it.recipe.name}") }
+            sb.appendLine("• Món đã nấu gần đây: ${recent.joinToString(", ") { it.recipe.name }}")
         }
-        sb.appendLine("[Yêu cầu] Trả lời ngắn gọn tiếng Việt, đề xuất món phù hợp với tủ lạnh + sở thích người dùng khi có thể.")
+        sb.appendLine()
+        sb.appendLine("=== QUY TẮC PHẢN HỒI ===")
+        sb.appendLine("1. Khi người dùng hỏi kiểm tra tủ lạnh: Liệt kê rõ ràng các nguyên liệu đang có kèm số lượng. Nếu tủ lạnh trống, hãy nhắc họ vào mục 'Tủ lạnh' để thêm vào.")
+        sb.appendLine("2. Khi người dùng muốn gợi ý món: Ưu tiên tận dụng tối đa các nguyên liệu đang có trong tủ lạnh và hợp khẩu vị người dùng.")
+        sb.appendLine("3. Hướng dẫn công thức nấu: Trình bày rõ ràng gồm Tên món, Nguyên liệu cần chuẩn bị, Thời gian nấu và các Bước thực hiện ngắn gọn, dễ làm.")
+        sb.appendLine("4. Văn phong: Tự nhiên, nhiệt tình, gần gũi, dùng tiếng Việt chuẩn mực.")
+        sb.appendLine("5. Trả lời trực tiếp, cô đọng, đi thẳng vào món ăn và công thức, không suy nghĩ hay diễn giải dài dòng.")
         return sb.toString().trim()
     }
 
@@ -173,16 +204,15 @@ class DefaultAiService(
         systemContext: String?
     ): AiRaw {
         val url = settings.baseUrl.trimEnd('/') + "/chat/completions"
-        val systemText = buildString {
-            append("Bạn là trợ lý nấu ăn tiếng Việt, gợi ý ngắn gọn.")
-            if (!systemContext.isNullOrBlank()) {
-                append("\n\n").append(systemContext)
-            }
-        }
+        val systemText = systemContext?.takeIf { it.isNotBlank() }
+            ?: "Bạn là trợ lý nấu ăn tiếng Việt của Cooking Note, tư vấn món ăn và gợi ý công thức ngắn gọn, dễ làm."
         val body = buildString {
             append("{")
             append("\"model\":\"").append(settings.model).append("\",")
-            append("\"max_tokens\":").append(settings.maxTokens).append(",")
+            append("\"stream\":false,")
+            if (settings.maxTokens > 0) {
+                append("\"max_tokens\":").append(settings.maxTokens).append(",")
+            }
             append("\"messages\":[")
             append("{\"role\":\"system\",\"content\":").append(jsonEscape(systemText)).append("},")
             history.forEach { (role, content) ->
@@ -194,7 +224,9 @@ class DefaultAiService(
         }
         val raw = postJson(url, settings.apiKey, body, useBearer = true)
         val content = extractJsonStringAfter(raw, "\"content\":")
+            ?: extractAllStringsAfter(raw, "\"content\":").joinToString("").takeIf { it.isNotBlank() }
         val reasoning = extractJsonStringAfter(raw, "\"reasoning_content\":")
+            ?: extractJsonStringAfter(raw, "\"reasoning\":")
         val finish = extractJsonStringAfter(raw, "\"finish_reason\":")
         return AiRaw(
             text = content?.takeIf { it.isNotBlank() && it != "null" } ?: "",
@@ -212,10 +244,11 @@ class DefaultAiService(
         val url = settings.baseUrl.trimEnd('/') + "/chat/completions"
         val dataUrl = "data:image/jpeg;base64," +
             Base64.getEncoder().encodeToString(imageBytes)
+        val maxTokensClause = if (settings.maxTokens > 0) "\"max_tokens\": ${settings.maxTokens}," else ""
         val body = """
             {
               "model": "${settings.model}",
-              "max_tokens": ${settings.maxTokens},
+              $maxTokensClause
               "messages": [{
                 "role": "user",
                 "content": [
@@ -228,6 +261,7 @@ class DefaultAiService(
         val raw = postJson(url, settings.apiKey, body, useBearer = true)
         val content = extractJsonStringAfter(raw, "\"content\":")
         val reasoning = extractJsonStringAfter(raw, "\"reasoning_content\":")
+            ?: extractJsonStringAfter(raw, "\"reasoning\":")
         return AiRaw(
             text = content?.takeIf { it.isNotBlank() && it != "null" } ?: "",
             reasoning = reasoning?.takeIf { it.isNotBlank() && it != "null" },
@@ -257,10 +291,11 @@ class DefaultAiService(
         }
         input.append("{\"role\":\"user\",\"content\":").append(jsonEscape(prompt)).append("}")
         input.append("]")
+        val maxTokensClause = if (settings.maxTokens > 0) "\"max_output_tokens\": ${settings.maxTokens}," else ""
         val body = """
             {
               "model": "${settings.model}",
-              "max_output_tokens": ${settings.maxTokens},
+              $maxTokensClause
               "input": $input
             }
         """.trimIndent()
@@ -284,10 +319,11 @@ class DefaultAiService(
         val url = settings.baseUrl.trimEnd('/') + "/responses"
         val dataUrl = "data:image/jpeg;base64," +
             Base64.getEncoder().encodeToString(imageBytes)
+        val maxTokensClause = if (settings.maxTokens > 0) "\"max_output_tokens\": ${settings.maxTokens}," else ""
         val body = """
             {
               "model": "${settings.model}",
-              "max_output_tokens": ${settings.maxTokens},
+              $maxTokensClause
               "input": [{
                 "role": "user",
                 "content": [
@@ -322,16 +358,13 @@ class DefaultAiService(
         val messages = history.map { (role, content) ->
             """{"role":"$role","content":${jsonEscape(content)}}"""
         }
-        val systemText = buildString {
-            append("Bạn là trợ lý nấu ăn tiếng Việt, gợi ý ngắn gọn.")
-            if (!systemContext.isNullOrBlank()) {
-                append("\n\n").append(systemContext)
-            }
-        }
+        val systemText = systemContext?.takeIf { it.isNotBlank() }
+            ?: "Bạn là trợ lý nấu ăn tiếng Việt của Cooking Note, tư vấn món ăn và gợi ý công thức ngắn gọn, dễ làm."
+        val maxTokensClause = if (settings.maxTokens > 0) "\"max_tokens\": ${settings.maxTokens}," else "\"max_tokens\": 8192,"
         val body = """
             {
               "model": "${settings.model}",
-              "max_tokens": ${settings.maxTokens},
+              $maxTokensClause
               "system": ${jsonEscape(systemText)},
               "messages": [
                 ${messages.joinToString(",")},
@@ -378,10 +411,11 @@ class DefaultAiService(
         sb.append("{\"role\":\"user\",\"parts\":[{\"text\":")
             .append(jsonEscape(prompt)).append("}]}")
         sb.append("]")
+        val genConfigClause = if (settings.maxTokens > 0) ",\"generationConfig\": {\"maxOutputTokens\": ${settings.maxTokens}}" else ""
         val body = """
             {
-              "contents": ${sb.toString()},
-              "generationConfig": {"maxOutputTokens": ${settings.maxTokens}}
+              "contents": ${sb.toString()}
+              $genConfigClause
             }
         """.trimIndent()
         val raw = postJson(url, "", body, useBearer = false)
@@ -403,6 +437,7 @@ class DefaultAiService(
         val model = settings.model.ifBlank { "gemini-1.5-flash" }
         val url = "${settings.baseUrl.trimEnd('/')}/v1beta/models/$model:generateContent?key=${settings.apiKey}"
         val b64 = Base64.getEncoder().encodeToString(imageBytes)
+        val genConfigClause = if (settings.maxTokens > 0) ",\"generationConfig\":{\"maxOutputTokens\":${settings.maxTokens}}" else ""
         val body = """
             {
               "contents":[{
@@ -411,8 +446,8 @@ class DefaultAiService(
                   {"text":${jsonEscape(prompt)}},
                   {"inline_data":{"mime_type":"image/jpeg","data":"$b64"}}
                 ]
-              }],
-              "generationConfig":{"maxOutputTokens":${settings.maxTokens}}
+              }]
+              $genConfigClause
             }
         """.trimIndent()
         val raw = postJson(url, "", body, useBearer = false)

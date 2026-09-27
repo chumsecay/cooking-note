@@ -55,4 +55,15 @@ class RuleBasedAiTest {
         assertTrue("Should fallback to returning available recipes", suggestions.isNotEmpty())
         assertEquals("rule-based", suggestions.first().source)
     }
+
+    @Test
+    fun suggest_pantryChecking_returnsPantryItems() = runTest {
+        coEvery { mockRepository.getPantrySnapshot() } returns listOf(
+            com.cookingnote.app.data.entity.PantryItemEntity(id = 1, name = "Trứng gà", amount = 4.0, unit = "quả")
+        )
+        val suggestions = ruleBasedAi.suggest("Check cho tôi nguyên liệu trong tủ lạnh")
+
+        assertTrue("Should return suggestion", suggestions.isNotEmpty())
+        assertTrue("Detail should mention Trứng gà", suggestions.first().detail!!.contains("Trứng gà"))
+    }
 }

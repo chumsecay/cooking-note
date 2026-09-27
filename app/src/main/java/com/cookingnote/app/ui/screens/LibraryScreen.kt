@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -42,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cookingnote.app.data.entity.CategoryEntity
 import com.cookingnote.app.data.entity.RecipeEntity
 import com.cookingnote.app.ui.components.RecipeCard
+import com.cookingnote.app.ui.components.SyncStatusBadge
 import com.cookingnote.app.ui.local.LocalAppContainer
 import com.cookingnote.app.ui.viewmodel.AppViewModelFactory
 import com.cookingnote.app.ui.viewmodel.LibraryUiState
@@ -101,8 +105,12 @@ fun LibraryContent(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Thư viện") },
+                title = { Text("Thư viện", fontWeight = FontWeight.SemiBold) },
                 actions = {
+                    SyncStatusBadge(
+                        status = uiState.syncStatus,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
                     IconButton(onClick = onOpenSearch) {
                         Icon(Icons.Filled.Search, contentDescription = "Tìm")
                     }
@@ -119,7 +127,10 @@ fun LibraryContent(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onCreate) {
+            FloatingActionButton(
+                onClick = onCreate,
+                shape = RoundedCornerShape(16.dp)
+            ) {
                 Icon(Icons.Filled.Add, contentDescription = "Thêm")
             }
         }
@@ -231,7 +242,7 @@ fun LibraryContent(
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(uiState.recipes, key = { it.id }) { recipe ->
                             RecipeCard(
@@ -263,13 +274,17 @@ private fun CategoryChipsRow(
         FilterChip(
             selected = selectedCategoryId == null,
             onClick = { onSelectCategory(null) },
-            label = { Text("Tất cả") }
+            label = { Text("Tất cả") },
+            shape = RoundedCornerShape(10.dp),
+            colors = FilterChipDefaults.filterChipColors()
         )
         categories.forEach { cat ->
             FilterChip(
                 selected = selectedCategoryId == cat.id,
                 onClick = { onSelectCategory(cat.id) },
-                label = { Text(cat.name) }
+                label = { Text(cat.name) },
+                shape = RoundedCornerShape(10.dp),
+                colors = FilterChipDefaults.filterChipColors()
             )
         }
     }

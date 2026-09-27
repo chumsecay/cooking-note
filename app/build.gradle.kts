@@ -1,9 +1,23 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+val envFile = rootProject.file(".env").takeIf { it.exists() }
+    ?: rootProject.file(".env.example").takeIf { it.exists() }
+
+val envProps = Properties().apply {
+    if (envFile != null && envFile.exists()) {
+        envFile.inputStream().use { load(it) }
+    }
+}
+
+fun getEnv(key: String, default: String): String =
+    envProps.getProperty(key)?.trim() ?: default
 
 android {
     namespace = "com.cookingnote.app"
@@ -17,6 +31,18 @@ android {
         versionName = "1.0"
 
         vectorDrawables { useSupportLibrary = true }
+
+        val aiProvider = getEnv("AI_PROVIDER", "GEMINI")
+        val aiBaseUrl = getEnv("AI_BASE_URL", "https://generativelanguage.googleapis.com/")
+        val aiModel = getEnv("AI_MODEL", "gemini-1.5-flash")
+        val aiApiKey = getEnv("AI_API_KEY", "")
+        val aiMaxTokens = getEnv("AI_MAX_TOKENS", "1500").toIntOrNull() ?: 1500
+
+        buildConfigField("String", "AI_PROVIDER", "\"$aiProvider\"")
+        buildConfigField("String", "AI_BASE_URL", "\"$aiBaseUrl\"")
+        buildConfigField("String", "AI_MODEL", "\"$aiModel\"")
+        buildConfigField("String", "AI_API_KEY", "\"$aiApiKey\"")
+        buildConfigField("int", "AI_MAX_TOKENS", "$aiMaxTokens")
     }
 
     buildTypes {
@@ -37,6 +63,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {

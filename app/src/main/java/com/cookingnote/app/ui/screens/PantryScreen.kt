@@ -1,5 +1,6 @@
 package com.cookingnote.app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -31,6 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -41,9 +44,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cookingnote.app.ui.components.SyncStatusBadge
 import com.cookingnote.app.ui.local.LocalAppContainer
 import com.cookingnote.app.ui.viewmodel.AppViewModelFactory
 import com.cookingnote.app.ui.viewmodel.PantryUiState
@@ -68,6 +73,7 @@ fun PantryScreen(
         onAddItem = viewModel::addItem,
         onDeleteItem = viewModel::deleteItem,
         onDismissError = viewModel::clearError,
+        onLoadRecommendations = viewModel::loadSmartRecommendations,
         modifier = modifier
     )
 }
@@ -84,17 +90,27 @@ fun PantryContent(
     onAddItem: (name: String, amount: Double, unit: String) -> Unit,
     onDeleteItem: (id: Long) -> Unit,
     onDismissError: () -> Unit,
+    onLoadRecommendations: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Tủ lạnh / Nguyên liệu") }
+                title = { Text("Tủ lạnh / Nguyên liệu", fontWeight = FontWeight.SemiBold) },
+                actions = {
+                    SyncStatusBadge(
+                        status = uiState.syncStatus,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onShowAddDialog) {
+            FloatingActionButton(
+                onClick = onShowAddDialog,
+                shape = RoundedCornerShape(16.dp)
+            ) {
                 Icon(Icons.Filled.Add, contentDescription = "Thêm nguyên liệu")
             }
         }
@@ -132,6 +148,7 @@ fun PantryContent(
                         Text(
                             text = "Tủ lạnh đang trống",
                             style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -153,6 +170,7 @@ fun PantryContent(
                             item(key = "error_banner") {
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(
                                         containerColor = MaterialTheme.colorScheme.errorContainer
                                     )
@@ -183,9 +201,11 @@ fun PantryContent(
                             item(key = "low_stock_banner") {
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(
                                         containerColor = MaterialTheme.colorScheme.errorContainer
-                                    )
+                                    ),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(16.dp),
@@ -201,6 +221,7 @@ fun PantryContent(
                                             Text(
                                                 text = "Sắp hết nguyên liệu",
                                                 style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.error
                                             )
                                             Text(
@@ -214,28 +235,137 @@ fun PantryContent(
                             }
                         }
 
+                        // Smart Recommendations Section
+                        item(key = "recommendations_header") {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Gợi ý món ăn từ tủ lạnh (v2)",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Button(
+                                            onClick = onLoadRecommendations,
+                                            enabled = !uiState.isLoadingRecommendations
+                                        ) {
+                                            if (uiState.isLoadingRecommendations) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(16.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = MaterialTheme.colorScheme.onPrimary
+                                                )
+                                            } else {
+                                                Text("Gợi ý ngay")
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = "Khớp các nguyên liệu sẵn có với kho công thức từ máy chủ Backend SmartChef",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        if (uiState.recommendations.isNotEmpty()) {
+                            item(key = "recommendations_list") {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    uiState.recommendations.forEach { rec ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = rec.title,
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Text(
+                                                        text = "Độ khớp: ${(rec.coverageRatio * 100).toInt()}% (${rec.haveCount}/${rec.needCount} nguyên liệu)",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    if (rec.missingIngredients.isNotEmpty()) {
+                                                        Text(
+                                                            text = "Thiếu: ${rec.missingIngredients.joinToString()}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.error
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        item(key = "pantry_items_header") {
+                            Text(
+                                text = "Danh sách nguyên liệu trong tủ",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
+
                         items(uiState.items, key = { it.id }) { item ->
-                            Card(modifier = Modifier.fillMaxWidth()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
                                 Row(
                                     modifier = Modifier.padding(16.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
                                         Text(
                                             text = item.name,
-                                            style = MaterialTheme.typography.titleMedium
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold
                                         )
-                                        Text(
-                                            text = "${item.amount} ${item.unit}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+                                        ) {
+                                            Text(
+                                                text = "${item.amount} ${item.unit}",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
                                     }
                                     IconButton(onClick = { onDeleteItem(item.id) }) {
                                         Icon(
                                             imageVector = Icons.Filled.Delete,
-                                            contentDescription = "Xóa"
+                                            contentDescription = "Xóa",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }

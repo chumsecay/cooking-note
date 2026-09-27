@@ -72,4 +72,55 @@ class SettingsViewModelTest {
         assertEquals("gemini-2.0-flash", updatedSettings?.model)
         assertEquals("secret-api-key", updatedSettings?.apiKey)
     }
+
+    @Test
+    fun customEndpoint_defaultsToFalse_andTogglingUpdatesState() = runTest(testDispatcher) {
+        val viewModel = SettingsViewModel(mockStore, tempDbFile, testDispatcher)
+        runCurrent()
+
+        assertEquals(false, viewModel.uiState.value.isCustomEndpoint)
+
+        viewModel.onCustomEndpointToggled(true)
+        assertEquals(true, viewModel.uiState.value.isCustomEndpoint)
+
+        viewModel.onCustomEndpointToggled(false)
+        runCurrent()
+        assertEquals(false, viewModel.uiState.value.isCustomEndpoint)
+    }
+
+    @Test
+    fun testAiConnection_success_updatesUiStateWithMessage() = runTest(testDispatcher) {
+        val mockAi = mockk<com.cookingnote.app.ai.AiService>()
+        coEvery { mockAi.testConnection() } returns "Kết nối thành công tới OpenAI!"
+
+        val viewModel = SettingsViewModel(mockStore, tempDbFile, testDispatcher, aiService = mockAi)
+        runCurrent()
+
+        viewModel.testAiConnection()
+        runCurrent()
+
+        val state = viewModel.uiState.value
+        assertEquals(false, state.isTestingConnection)
+        assertEquals(true, state.isTestSuccess)
+        assertTrue(state.testConnectionResult?.contains("Kết nối thành công") == true)
+    }
+
+    @Test
+    fun testAiConnection_failure_updatesUiStateWithErrorMessage() = runTest(testDispatcher) {
+        val mockAi = mockk<com.cookingnote.app.ai.AiService>()
+        coEvery { mockAi.testConnection() } throws RuntimeException("401 Unauthorized")
+
+        val viewModel = SettingsViewModel(mockStore, tempDbFile, testDispatcher, aiService = mockAi)
+        runCurrent()
+
+        viewModel.testAiConnection()
+        runCurrent()
+
+        val state = viewModel.uiState.value
+        assertEquals(false, state.isTestingConnection)
+        assertEquals(false, state.isTestSuccess)
+        assertTrue(state.testConnectionResult?.contains("401 Unauthorized") == true)
+        assertTrue(state.errorMessage?.contains("401 Unauthorized") == true)
+    }
 }
+

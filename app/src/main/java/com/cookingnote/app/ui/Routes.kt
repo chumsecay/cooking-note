@@ -10,6 +10,7 @@ sealed class Route(val path: String) {
     data object History : Route("history")
     data object Create : Route("create")
     data object Search : Route("search")
+    data object Auth : Route("auth")
 
     data object Detail : Route("detail/{id}") {
         fun of(id: Long) = "detail/$id"

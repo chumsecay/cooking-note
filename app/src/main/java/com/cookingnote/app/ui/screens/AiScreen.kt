@@ -279,8 +279,22 @@ private fun MessageBubble(message: ChatMessageEntity, onOpenRecipe: (Long) -> Un
                 )
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
+            val styledText = remember(message.content) {
+                androidx.compose.ui.text.buildAnnotatedString {
+                    val parts = message.content.split("**")
+                    parts.forEachIndexed { index, part ->
+                        if (index % 2 == 1) {
+                            pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
+                            append(part)
+                            pop()
+                        } else {
+                            append(part)
+                        }
+                    }
+                }
+            }
             Text(
-                text = message.content,
+                text = styledText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = fg
             )

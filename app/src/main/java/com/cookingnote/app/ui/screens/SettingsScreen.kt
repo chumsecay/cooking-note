@@ -1,13 +1,16 @@
 package com.cookingnote.app.ui.screens
 
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -25,6 +28,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,23 +50,13 @@ import com.cookingnote.app.ui.viewmodel.AppViewModelFactory
 import com.cookingnote.app.ui.viewmodel.SettingsUiState
 import com.cookingnote.app.ui.viewmodel.SettingsViewModel
 
-/**
- * Cờ ẩn/hiện custom provider.
- *
- * - false (mặc định production): Settings chỉ hiện công tắc cloud + API key
- *   của provider mặc định (Gemini), không hiện Base URL / Model / danh sách provider.
- * - true: hiện thêm mục "Cài đặt nâng cao" để chỉnh Base URL / Model / provider
- *   khi cần đưa custom provider vào sử dụng. Logic provider + DefaultAiService
- *   giữ nguyên nên chỉ cần bật cờ này, không phải viết lại.
- */
-private const val SHOW_CUSTOM_PROVIDER_UI = false
-
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel(
         factory = AppViewModelFactory(LocalAppContainer.current)
-    )
+    ),
+    onOpenAuth: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -79,6 +73,8 @@ fun SettingsScreen(
     SettingsContent(
         uiState = uiState,
         onCloudEnabledChanged = viewModel::onCloudEnabledChanged,
+        onCustomEndpointToggled = viewModel::onCustomEndpointToggled,
+        onUsePresetCloudSelected = viewModel::onUsePresetCloudSelected,
         onProviderSelected = viewModel::onProviderSelected,
         onBaseUrlChanged = viewModel::onBaseUrlChanged,
         onApiKeyChanged = viewModel::onApiKeyChanged,
@@ -87,6 +83,7 @@ fun SettingsScreen(
         onDropdownExpandedChanged = viewModel::setProviderDropdownExpanded,
         onAdvancedExpandedChanged = viewModel::setAdvancedExpanded,
         onSaveAiSettings = { viewModel.saveAiSettings() },
+        onTestAiConnection = { viewModel.testAiConnection() },
         onBackupDatabase = {
             viewModel.backupDatabase(context.cacheDir) { backupFile ->
                 val uri = FileProvider.getUriForFile(
@@ -102,6 +99,7 @@ fun SettingsScreen(
                 context.startActivity(Intent.createChooser(intent, "Backup database"))
             }
         },
+        onOpenAuth = onOpenAuth,
         snackbarHostState = snackbarHostState,
         modifier = modifier
     )
@@ -112,6 +110,8 @@ fun SettingsScreen(
 fun SettingsContent(
     uiState: SettingsUiState,
     onCloudEnabledChanged: (Boolean) -> Unit,
+    onCustomEndpointToggled: (Boolean) -> Unit,
+    onUsePresetCloudSelected: () -> Unit,
     onProviderSelected: (AiProviderType) -> Unit,
     onBaseUrlChanged: (String) -> Unit,
     onApiKeyChanged: (String) -> Unit,
@@ -120,7 +120,9 @@ fun SettingsContent(
     onDropdownExpandedChanged: (Boolean) -> Unit,
     onAdvancedExpandedChanged: (Boolean) -> Unit,
     onSaveAiSettings: () -> Unit,
+    onTestAiConnection: () -> Unit = {},
     onBackupDatabase: () -> Unit,
+    onOpenAuth: () -> Unit = {},
     snackbarHostState: SnackbarHostState? = null,
     modifier: Modifier = Modifier
 ) {
@@ -137,155 +139,327 @@ fun SettingsContent(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Trợ lý AI", style = MaterialTheme.typography.titleLarge)
-
+            // --- MỤC 0: TÀI KHOẢN SMARTCHEF V2 ---
+            Text("Tài khoản & Đám mây", style = MaterialTheme.typography.titleMedium)
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Đồng bộ công thức và sử dụng trí tuệ nhân tạo đề xuất theo nguyên liệu từ SmartChef Cloud.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(
+                        onClick = onOpenAuth,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Quản lý tài khoản SmartChef")
+                    }
+                }
+            }
+
+            // --- MỤC 1: TRẢI NGHIỆM & GIAO DIỆN ---
+            Text("Giao diện & Hiển thị", style = MaterialTheme.typography.titleMedium)
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "Dùng AI đám mây",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = uiState.isCloudEnabled,
-                            onCheckedChange = onCloudEnabledChanged,
-                            enabled = !uiState.isSaving
-                        )
-                    }
-                    Text(
-                        if (uiState.isCloudEnabled) {
-                            "Đã bật AI đám mây (mặc định ${AiCloudDefaults.CLOUD_MODEL}). " +
-                                "Nhập API key rồi lưu để dùng."
-                        } else {
-                            "Đang dùng gợi ý offline — không cần mạng, không cần API key."
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            if (uiState.isCloudEnabled) {
-                OutlinedTextField(
-                    value = uiState.apiKey,
-                    onValueChange = onApiKeyChanged,
-                    label = { Text("API Key") },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !uiState.isSaving,
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                )
-                Text(
-                    "Muốn dùng provider/endpoint khác thì bật SHOW_CUSTOM_PROVIDER_UI " +
-                        "để mở mục nâng cao (code provider giữ nguyên).",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Button(
-                onClick = onSaveAiSettings,
-                enabled = !uiState.isSaving,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Giữ literal uiState.isSaving cho test kiến trúc.
-                Text(if (uiState.isSaving) "Đang lưu…" else "Lưu cấu hình AI")
-            }
-
-            if (SHOW_CUSTOM_PROVIDER_UI) {
-                OutlinedButton(
-                    onClick = { onAdvancedExpandedChanged(!uiState.isAdvancedExpanded) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(if (uiState.isAdvancedExpanded) "Ẩn cài đặt nâng cao" else "Cài đặt nâng cao")
-                }
-
-                if (uiState.isAdvancedExpanded) {
-                    ExposedDropdownMenuBox(
-                        expanded = uiState.isProviderDropdownExpanded,
-                        onExpandedChange = onDropdownExpandedChanged
-                    ) {
-                        OutlinedTextField(
-                            value = uiState.provider.label,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Provider / Endpoint chuẩn") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(uiState.isProviderDropdownExpanded)
-                            },
-                            modifier = Modifier
-                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                                .fillMaxWidth()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = uiState.isProviderDropdownExpanded,
-                            onDismissRequest = { onDropdownExpandedChanged(false) }
-                        ) {
-                            AiProviderType.entries.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type.label) },
-                                    onClick = { onProviderSelected(type) }
-                                )
-                            }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Chế độ tối", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Tự động theo hệ thống thiết bị",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 
-                    Text(
-                        "Endpoint sẽ gọi: ${uiState.endpointSummary}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Ngôn ngữ", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Tiếng Việt (Mặc định)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
 
-                    OutlinedTextField(
-                        value = uiState.baseUrl,
-                        onValueChange = onBaseUrlChanged,
-                        label = { Text("Base URL") },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = uiState.isKeyRequired && !uiState.isSaving
-                    )
-                    OutlinedTextField(
-                        value = uiState.model,
-                        onValueChange = onModelChanged,
-                        label = { Text("Model") },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = uiState.isKeyRequired && !uiState.isSaving
-                    )
-                    OutlinedTextField(
-                        value = uiState.maxTokens,
-                        onValueChange = onMaxTokensChanged,
-                        label = { Text("max_tokens (256 – 8192)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = uiState.isKeyRequired && !uiState.isSaving,
-                        singleLine = true
-                    )
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Đơn vị đo lường", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Hệ mét tiêu chuẩn (gam, mililit, muỗng cà phê)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
 
-            Text("Dữ liệu", style = MaterialTheme.typography.titleLarge)
-            Button(
-                onClick = onBackupDatabase,
-                // Giữ literal uiState.isBackingUp cho test kiến trúc.
-                enabled = !uiState.isBackingUp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (uiState.isBackingUp) "Đang sao lưu…" else "Backup SQLite")
+            // --- MỤC 2: TRỢ LÝ NẤU ĂN AI (CHUYỂN ĐỔI CLOUD CÀI SẴN VÀ CUSTOM ENDPOINT) ---
+            Text("Trợ lý trí tuệ nhân tạo (AI)", style = MaterialTheme.typography.titleMedium)
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Kết nối trợ lý thông minh",
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Text(
+                                if (!uiState.isCustomEndpoint) {
+                                    "Đang sử dụng hệ thống đám mây tiêu chuẩn. Sẵn sàng gợi ý món ăn, giải đáp công thức và gợi ý nguyên liệu."
+                                } else {
+                                    "Đang sử dụng máy chủ tùy chỉnh cá nhân (chế độ nâng cao)."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Tự cấu hình máy chủ riêng",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                "Chỉ bật nếu bạn muốn kết nối vào máy chủ AI tự dựng hoặc mô hình riêng tư.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = uiState.isCustomEndpoint,
+                            onCheckedChange = onCustomEndpointToggled,
+                            enabled = !uiState.isSaving && !uiState.isTestingConnection
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = onTestAiConnection,
+                        enabled = !uiState.isSaving && !uiState.isTestingConnection,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (uiState.isTestingConnection) "Đang kiểm tra kết nối AI..." else "Kiểm tra kết nối AI")
+                    }
+
+                    if (uiState.testConnectionResult != null) {
+                        val isSuccess = uiState.isTestSuccess == true
+                        val cardBg = if (isSuccess) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                        }
+                        val textColor = if (isSuccess) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(cardBg, shape = RoundedCornerShape(8.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = uiState.testConnectionResult,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = textColor
+                            )
+                        }
+                    }
+                }
             }
 
-            Text(
-                "App: Sổ tay Nấu ăn · Mặc định chạy offline. " +
-                    "Bật công tắc AI đám mây và nhập key khi cần dùng Gemini.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Form cấu hình custom endpoint khi người dùng chọn bật
+            if (uiState.isCustomEndpoint) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            "Thông số máy chủ tùy chỉnh:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        OutlinedTextField(
+                            value = uiState.baseUrl,
+                            onValueChange = onBaseUrlChanged,
+                            label = { Text("Base URL máy chủ") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !uiState.isSaving
+                        )
+
+                        OutlinedTextField(
+                            value = uiState.model,
+                            onValueChange = onModelChanged,
+                            label = { Text("Tên mô hình (Model)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !uiState.isSaving
+                        )
+
+                        OutlinedTextField(
+                            value = uiState.apiKey,
+                            onValueChange = onApiKeyChanged,
+                            label = { Text("Khóa API (Để trống nếu proxy v2 tự xác thực)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !uiState.isSaving,
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                        )
+
+                        OutlinedTextField(
+                            value = uiState.maxTokens,
+                            onValueChange = onMaxTokensChanged,
+                            label = { Text("max_tokens (0 = Không giới hạn)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !uiState.isSaving,
+                            singleLine = true
+                        )
+
+                        // Mục Provider tinh giản, kín đáo cho người dùng chuyên sâu
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Giao thức: ${uiState.provider.label}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            TextButton(onClick = { onAdvancedExpandedChanged(!uiState.isAdvancedExpanded) }) {
+                                Text(
+                                    if (uiState.isAdvancedExpanded) "Đóng" else "Đổi loại",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+
+                        if (uiState.isAdvancedExpanded) {
+                            ExposedDropdownMenuBox(
+                                expanded = uiState.isProviderDropdownExpanded,
+                                onExpandedChange = onDropdownExpandedChanged
+                            ) {
+                                OutlinedTextField(
+                                    value = uiState.provider.label,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Loại Provider") },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(uiState.isProviderDropdownExpanded)
+                                    },
+                                    modifier = Modifier
+                                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                        .fillMaxWidth()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = uiState.isProviderDropdownExpanded,
+                                    onDismissRequest = { onDropdownExpandedChanged(false) }
+                                ) {
+                                    AiProviderType.entries.forEach { type ->
+                                        DropdownMenuItem(
+                                            text = { Text(type.label) },
+                                            onClick = { onProviderSelected(type) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TextButton(
+                                onClick = onUsePresetCloudSelected,
+                                enabled = !uiState.isSaving,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Khôi phục mặc định")
+                            }
+
+                            Button(
+                                onClick = onSaveAiSettings,
+                                enabled = !uiState.isSaving,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (uiState.isSaving) "Đang lưu…" else "Lưu cấu hình")
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- MỤC 3: DỮ LIỆU & BỘ NHỚ ---
+            Text("Dữ liệu & Bộ nhớ", style = MaterialTheme.typography.titleMedium)
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Sao lưu dữ liệu công thức và lịch sử nấu ăn an toàn ra tập tin để khôi phục hoặc chuyển máy.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = onBackupDatabase,
+                        enabled = !uiState.isBackingUp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (uiState.isBackingUp) "Đang sao lưu…" else "Sao lưu cơ sở dữ liệu")
+                    }
+                }
+            }
+
+            // --- MỤC 4: THÔNG TIN ỨNG DỤNG ---
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Sổ tay Nấu ăn · Cooking Note v2.0",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.cookingnote.app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,10 +9,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Search
@@ -32,12 +36,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cookingnote.app.data.entity.RecipeEntity
 import com.cookingnote.app.ui.components.RecipeCard
+import com.cookingnote.app.ui.components.SyncStatusBadge
 import com.cookingnote.app.ui.local.LocalAppContainer
 import com.cookingnote.app.ui.viewmodel.AppViewModelFactory
 import com.cookingnote.app.ui.viewmodel.HomeUiState
@@ -93,8 +100,12 @@ fun HomeContent(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Sổ tay Nấu ăn") },
+                title = { Text("Sổ tay Nấu ăn", fontWeight = FontWeight.SemiBold) },
                 actions = {
+                    SyncStatusBadge(
+                        status = uiState.syncStatus,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
                     IconButton(onClick = onOpenSearch) {
                         Icon(Icons.Filled.Search, contentDescription = "Tìm")
                     }
@@ -153,7 +164,7 @@ fun HomeContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        Text("Xin chào 👋", style = MaterialTheme.typography.headlineMedium)
+                        Text("Xin chào 👋", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         Text(
                             "Sổ tay công thức của bạn",
                             style = MaterialTheme.typography.bodyMedium,
@@ -175,9 +186,11 @@ fun HomeContent(
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         ) {
                             Column(
                                 modifier = Modifier
@@ -220,10 +233,10 @@ fun HomeContent(
                         .fillMaxSize()
                         .padding(padding),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     item {
-                        Text("Xin chào 👋", style = MaterialTheme.typography.headlineMedium)
+                        Text("Xin chào 👋", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         Text(
                             "Sổ tay công thức của bạn",
                             style = MaterialTheme.typography.bodyMedium,
@@ -233,10 +246,20 @@ fun HomeContent(
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            StatCard("Công thức", "${uiState.stats.total}", Modifier.weight(1f))
-                            StatCard("Yêu thích", "${uiState.stats.favorites}", Modifier.weight(1f))
+                            StatCard(
+                                label = "Công thức",
+                                value = "${uiState.stats.total}",
+                                icon = Icons.Filled.RestaurantMenu,
+                                modifier = Modifier.weight(1f)
+                            )
+                            StatCard(
+                                label = "Yêu thích",
+                                value = "${uiState.stats.favorites}",
+                                icon = Icons.Filled.Favorite,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                     item {
@@ -252,8 +275,8 @@ fun HomeContent(
                         }
                     }
                     if (uiState.todaysPicks.isNotEmpty()) {
-                        item { Text("Gợi ý hôm nay", style = MaterialTheme.typography.titleLarge) }
-                        items(uiState.todaysPicks, key = { it.id }) { recipe ->
+                        item { Text("Gợi ý hôm nay", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
+                        items(uiState.todaysPicks, key = { "pick_${it.id}" }) { recipe ->
                             RecipeCard(
                                 recipe = recipe,
                                 onClick = { onOpenRecipe(recipe.id) },
@@ -262,8 +285,8 @@ fun HomeContent(
                         }
                     }
                     if (uiState.favorites.isNotEmpty()) {
-                        item { Text("Yêu thích", style = MaterialTheme.typography.titleLarge) }
-                        items(uiState.favorites.take(5), key = { it.id }) { recipe ->
+                        item { Text("Yêu thích", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) }
+                        items(uiState.favorites.take(5), key = { "fav_${it.id}" }) { recipe ->
                             RecipeCard(
                                 recipe = recipe,
                                 onClick = { onOpenRecipe(recipe.id) },
@@ -278,14 +301,35 @@ fun HomeContent(
 }
 
 @Composable
-private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatCard(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier
+) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(value, style = MaterialTheme.typography.headlineSmall)
-            Text(label, style = MaterialTheme.typography.labelMedium)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+            )
         }
     }
 }

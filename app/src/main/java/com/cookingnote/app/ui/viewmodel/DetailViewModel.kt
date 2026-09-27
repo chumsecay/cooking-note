@@ -3,12 +3,14 @@ package com.cookingnote.app.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cookingnote.app.data.entity.RecipeWithDetails
+import com.cookingnote.app.data.remote.model.SyncStatus
 import com.cookingnote.app.data.repository.CookbookRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -16,10 +18,13 @@ import kotlinx.coroutines.launch
  * UI State representation for the Recipe Detail screen.
  */
 sealed interface DetailUiState {
+    val syncStatus: SyncStatus get() = SyncStatus.Synced
+
     data object Loading : DetailUiState
     data object Empty : DetailUiState
     data class Content(
-        val recipeWithDetails: RecipeWithDetails
+        val recipeWithDetails: RecipeWithDetails,
+        override val syncStatus: SyncStatus = SyncStatus.Synced
     ) : DetailUiState
     data class Error(val message: String) : DetailUiState
 }
@@ -35,17 +40,21 @@ class DetailViewModel(
     val uiState: StateFlow<DetailUiState> = if (recipeId <= 0L) {
         flowOf<DetailUiState>(DetailUiState.Empty)
     } else {
-        repository.observeRecipe(recipeId)
-            .map { details ->
-                if (details == null) {
-                    DetailUiState.Empty
-                } else {
-                    DetailUiState.Content(recipeWithDetails = details)
-                }
+        combine(
+            repository.observeRecipe(recipeId),
+            repository.observeSyncStatus().onStart { emit(SyncStatus.Synced) }
+        ) { details, syncStatus ->
+            if (details == null) {
+                DetailUiState.Empty
+            } else {
+                DetailUiState.Content(
+                    recipeWithDetails = details,
+                    syncStatus = syncStatus
+                )
             }
-            .catch { throwable ->
-                emit(DetailUiState.Error(throwable.localizedMessage ?: "Đã xảy ra lỗi khi tải chi tiết công thức"))
-            }
+        }.catch { throwable ->
+            emit(DetailUiState.Error(throwable.localizedMessage ?: "Đã xảy ra lỗi khi tải chi tiết công thức"))
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),

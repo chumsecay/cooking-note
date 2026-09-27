@@ -56,7 +56,8 @@ data class AiSettings(
     val baseUrl: String = "",
     val apiKey: String = "",
     val model: String = "",
-    val maxTokens: Int = 1500
+    val maxTokens: Int = 1500,
+    val isCustom: Boolean = false
 )
 
 class AiSettingsStore(context: Context) {
@@ -78,25 +79,43 @@ class AiSettingsStore(context: Context) {
     val settings: StateFlow<AiSettings> = _settings.asStateFlow()
 
     private fun load(): AiSettings {
-        val providerName = prefs.getString(KEY_PROVIDER, AiProviderType.RULE_BASED.name)
-            ?: AiProviderType.RULE_BASED.name
+        val isCustom = prefs.getBoolean(KEY_IS_CUSTOM, false)
+        if (!isCustom) {
+            return AiSettings(
+                provider = AiCloudDefaults.CLOUD_PROVIDER,
+                baseUrl = AiCloudDefaults.CLOUD_BASE_URL,
+                apiKey = AiCloudDefaults.CLOUD_API_KEY,
+                model = AiCloudDefaults.CLOUD_MODEL,
+                maxTokens = AiCloudDefaults.CLOUD_MAX_TOKENS,
+                isCustom = false
+            )
+        }
+        val defaultProvider = if (AiCloudDefaults.CLOUD_ENABLED_BY_DEFAULT) {
+            AiCloudDefaults.CLOUD_PROVIDER.name
+        } else {
+            AiProviderType.RULE_BASED.name
+        }
+        val providerName = prefs.getString(KEY_PROVIDER, defaultProvider) ?: defaultProvider
         val provider = runCatching { AiProviderType.valueOf(providerName) }
-            .getOrDefault(AiProviderType.RULE_BASED)
+            .getOrDefault(AiCloudDefaults.CLOUD_PROVIDER)
         return AiSettings(
             provider = provider,
             baseUrl = prefs.getString(KEY_BASE_URL, "").orEmpty()
                 .ifBlank { AiCloudDefaults.baseUrlFor(provider) },
-            apiKey = prefs.getString(KEY_API_KEY, "").orEmpty(),
+            apiKey = prefs.getString(KEY_API_KEY, "").orEmpty()
+                .ifBlank { if (provider == AiCloudDefaults.CLOUD_PROVIDER) AiCloudDefaults.CLOUD_API_KEY else "" },
             model = prefs.getString(KEY_MODEL, "").orEmpty()
                 .ifBlank { AiCloudDefaults.modelFor(provider) },
             maxTokens = prefs.getInt(KEY_MAX_TOKENS, AiCloudDefaults.CLOUD_MAX_TOKENS)
-                .coerceIn(256, 8192)
+                .coerceIn(0, 32768),
+            isCustom = true
         )
     }
 
     suspend fun update(transform: (AiSettings) -> AiSettings) = withContext(Dispatchers.IO) {
         val next = transform(_settings.value)
         prefs.edit()
+            .putBoolean(KEY_IS_CUSTOM, next.isCustom)
             .putString(KEY_PROVIDER, next.provider.name)
             .putString(KEY_BASE_URL, next.baseUrl)
             .putString(KEY_API_KEY, next.apiKey)
@@ -130,6 +149,7 @@ class AiSettingsStore(context: Context) {
     }
 
     companion object {
+        private const val KEY_IS_CUSTOM = "is_custom_endpoint"
         private const val KEY_PROVIDER = "provider"
         private const val KEY_BASE_URL = "base_url"
         private const val KEY_API_KEY = "api_key"

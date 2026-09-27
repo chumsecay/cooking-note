@@ -12,6 +12,7 @@ data class AiSuggestion(
 
 interface AiService {
     suspend fun chat(prompt: String, history: List<Pair<String, String>> = emptyList()): AiSuggestion
+    suspend fun testConnection(): String
     suspend fun suggestFromIngredients(ingredients: List<String>): List<AiSuggestion>
     suspend fun suggestFromImage(imageBytes: ByteArray): AiSuggestion
     val isCloudConfigured: Boolean

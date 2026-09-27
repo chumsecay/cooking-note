@@ -1,6 +1,7 @@
 package com.cookingnote.app.ui.screens
 
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -24,6 +28,8 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -31,6 +37,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -42,10 +49,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cookingnote.app.ui.components.SyncStatusBadge
 import com.cookingnote.app.ui.local.LocalAppContainer
 import com.cookingnote.app.ui.viewmodel.AppViewModelFactory
 import com.cookingnote.app.ui.viewmodel.DetailUiState
@@ -115,10 +124,12 @@ fun DetailContent(
             TopAppBar(
                 title = {
                     Text(
-                        when (uiState) {
+                        text = when (uiState) {
                             is DetailUiState.Content -> uiState.recipeWithDetails.recipe.name
                             else -> "Chi tiết"
-                        }
+                        },
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
                     )
                 },
                 navigationIcon = {
@@ -127,6 +138,10 @@ fun DetailContent(
                     }
                 },
                 actions = {
+                    SyncStatusBadge(
+                        status = uiState.syncStatus,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
                     if (uiState is DetailUiState.Content) {
                         val recipe = uiState.recipeWithDetails.recipe
                         IconButton(onClick = onToggleFavorite) {
@@ -231,41 +246,143 @@ fun DetailContent(
                         .padding(padding)
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     if (data.recipe.description.isNotBlank()) {
-                        Text(data.recipe.description, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            text = data.recipe.description,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    Text(
-                        text = "⏱ Chuẩn bị ${data.recipe.prepTime}′ · Nấu ${data.recipe.cookTime}′ · ${data.recipe.servings} phần · Độ khó ${data.recipe.difficulty}/3",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (data.category != null) {
-                        Text("Danh mục: ${data.category.name}", style = MaterialTheme.typography.labelMedium)
+
+                    // Metadata overview card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "⏱ Chuẩn bị ${data.recipe.prepTime}′ · Nấu ${data.recipe.cookTime}′ · ${data.recipe.servings} phần · Độ khó ${data.recipe.difficulty}/3",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (data.category != null) {
+                                Text(
+                                    text = "Danh mục: ${data.category.name}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
-                    Text("Nguyên liệu", style = MaterialTheme.typography.titleLarge)
-                    data.ingredients.forEach { ing ->
-                        Text("• ${formatAmount(ing.amount)} ${ing.unit} ${ing.name}".trim())
+
+                    // Ingredients section
+                    Text("Nguyên liệu", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            data.ingredients.forEach { ing ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(6.dp),
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primary
+                                    ) {}
+                                    Text(
+                                        text = "${formatAmount(ing.amount)} ${ing.unit} ${ing.name}".trim(),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
                     }
-                    Text("Cách làm", style = MaterialTheme.typography.titleLarge)
-                    data.steps.sortedBy { it.stepNumber }.forEach { step ->
-                        Text("${step.stepNumber}. ${step.description}")
+
+                    // Instructions section
+                    Text("Cách làm", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        data.steps.sortedBy { it.stepNumber }.forEach { step ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(24.dp),
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primaryContainer
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = "${step.stepNumber}",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = "${step.stepNumber}. ${step.description}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
                     }
+
                     if (data.recipe.notes.isNotBlank()) {
-                        Text("Ghi chú", style = MaterialTheme.typography.titleMedium)
-                        Text(data.recipe.notes)
+                        Text("Ghi chú", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = data.recipe.notes,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
                     }
+
                     Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
                             onClick = onMarkCooked,
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f)
                         ) { Text("Đã nấu hôm nay") }
-                        OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = onEdit,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Text("Sửa")
                         }
                     }

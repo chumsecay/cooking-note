@@ -22,6 +22,9 @@ import com.cookingnote.app.data.entity.RecipeWithDetails
 import com.cookingnote.app.data.entity.StepEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import com.cookingnote.app.data.remote.datasource.DefaultRemoteDataSource
+import com.cookingnote.app.data.remote.datasource.RemoteDataSource
+import com.cookingnote.app.data.remote.model.SyncStatus
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -35,8 +38,11 @@ class CookbookRepository(
     private val historyDao: HistoryDao,
     private val tagDao: TagDao,
     private val aiLogDao: AiLogDao,
-    private val chatDao: ChatMessageDao
+    private val chatDao: ChatMessageDao,
+    private val remoteDataSource: RemoteDataSource = DefaultRemoteDataSource()
 ) {
+    fun observeSyncStatus(): Flow<SyncStatus> = remoteDataSource.observeSyncStatus()
+
     fun observeRecipes(): Flow<List<RecipeEntity>> = recipeDao.observeAll()
     fun observeFavorites(): Flow<List<RecipeEntity>> = recipeDao.observeFavorites()
     fun searchRecipes(query: String): Flow<List<RecipeEntity>> =
@@ -71,6 +77,10 @@ class CookbookRepository(
         historyDao.recentSnapshot(limit)
     }
 
+    suspend fun getPantrySnapshot(): List<PantryItemEntity> = withContext(Dispatchers.IO) {
+        pantryDao.getAll()
+    }
+
     suspend fun appendMessage(role: String, content: String) = withContext(Dispatchers.IO) {
         chatDao.insert(
             ChatMessageEntity(role = role, content = content)
@@ -90,7 +100,12 @@ class CookbookRepository(
         ingredients: List<IngredientEntity>,
         steps: List<StepEntity>
     ): Long {
-        val id = recipeDao.upsert(recipe)
+        val id = if (recipe.id > 0) {
+            recipeDao.update(recipe)
+            recipe.id
+        } else {
+            recipeDao.upsert(recipe)
+        }
         ingredientDao.deleteByRecipe(id)
         stepDao.deleteByRecipe(id)
         ingredientDao.upsertAll(ingredients.mapIndexed { index, item ->
@@ -126,4 +141,16 @@ class CookbookRepository(
             )
         )
     }
+
+    suspend fun login(email: String, password: String): Result<com.cookingnote.app.data.remote.dto.AuthResponseDto> =
+        remoteDataSource.login(email, password)
+
+    suspend fun register(email: String, password: String, fullName: String): Result<com.cookingnote.app.data.remote.dto.AuthResponseDto> =
+        remoteDataSource.register(email, password, fullName)
+
+    suspend fun getProfile(): Result<com.cookingnote.app.data.remote.dto.UserProfileDto> =
+        remoteDataSource.getProfile()
+
+    suspend fun getSmartRecommendations(limit: Int = 20): Result<List<com.cookingnote.app.data.remote.dto.RecipeMatchDto>> =
+        remoteDataSource.matchPantry(limit)
 }

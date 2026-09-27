@@ -14,10 +14,12 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -31,6 +33,7 @@ import com.cookingnote.app.R
 import com.cookingnote.app.data.AppContainer
 import com.cookingnote.app.ui.local.LocalAppContainer
 import com.cookingnote.app.ui.screens.AiScreen
+import com.cookingnote.app.ui.screens.AuthScreen
 import com.cookingnote.app.ui.screens.CreateRecipeScreen
 import com.cookingnote.app.ui.screens.DetailScreen
 import com.cookingnote.app.ui.screens.FavoritesScreen
@@ -42,6 +45,7 @@ import com.cookingnote.app.ui.screens.SearchScreen
 import com.cookingnote.app.ui.screens.SettingsScreen
 import com.cookingnote.app.ui.viewmodel.AiViewModel
 import com.cookingnote.app.ui.viewmodel.AppViewModelFactory
+import com.cookingnote.app.ui.viewmodel.AuthViewModel
 import com.cookingnote.app.ui.viewmodel.CreateRecipeViewModel
 import com.cookingnote.app.ui.viewmodel.DetailViewModel
 import com.cookingnote.app.ui.viewmodel.FavoritesViewModel
@@ -72,10 +76,23 @@ fun CookingNoteRoot(
     container: AppContainer = LocalAppContainer.current
 ) {
     val nav = rememberNavController()
+    val session by container.userSession.session.collectAsStateWithLifecycle()
+
+    LaunchedEffect(session.isLoggedIn) {
+        if (!session.isLoggedIn) {
+            val currentRoute = nav.currentBackStackEntry?.destination?.route
+            if (currentRoute != null && currentRoute != Route.Auth.path) {
+                nav.navigate(Route.Auth.path) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+        }
+    }
+
     Scaffold(
         bottomBar = { BottomBar(nav) }
     ) { padding ->
-        AppNavHost(nav = nav, padding = padding, container = container)
+        AppNavHost(nav = nav, padding = padding, container = container, isLoggedIn = session.isLoggedIn)
     }
 }
 
@@ -109,11 +126,12 @@ private fun BottomBar(nav: NavHostController) {
 private fun AppNavHost(
     nav: NavHostController,
     padding: PaddingValues,
-    container: AppContainer
+    container: AppContainer,
+    isLoggedIn: Boolean
 ) {
     NavHost(
         navController = nav,
-        startDestination = Route.Home.path,
+        startDestination = if (isLoggedIn) Route.Home.path else Route.Auth.path,
         modifier = Modifier.padding(padding)
     ) {
         composable(Route.Home.path) {
@@ -152,7 +170,30 @@ private fun AppNavHost(
         }
         composable(Route.Settings.path) {
             val viewModel: SettingsViewModel = viewModel(factory = AppViewModelFactory(container))
-            SettingsScreen(viewModel = viewModel)
+            SettingsScreen(
+                viewModel = viewModel,
+                onOpenAuth = { nav.navigate(Route.Auth.path) }
+            )
+        }
+        composable(Route.Auth.path) {
+            val viewModel: AuthViewModel = viewModel(factory = AppViewModelFactory(container))
+            AuthScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    if (nav.previousBackStackEntry != null) {
+                        nav.popBackStack()
+                    } else {
+                        nav.navigate(Route.Home.path) {
+                            popUpTo(Route.Auth.path) { inclusive = true }
+                        }
+                    }
+                },
+                onAuthSuccess = {
+                    nav.navigate(Route.Home.path) {
+                        popUpTo(Route.Auth.path) { inclusive = true }
+                    }
+                }
+            )
         }
         composable(Route.Favorites.path) {
             val viewModel: FavoritesViewModel = viewModel(factory = AppViewModelFactory(container))

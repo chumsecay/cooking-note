@@ -12,6 +12,8 @@ import com.cookingnote.app.data.prefs.AiCloudDefaults
 import com.cookingnote.app.data.prefs.AiRemoteConfig
 import com.cookingnote.app.data.prefs.AiSettingsStore
 import com.cookingnote.app.data.prefs.UserPrefsStore
+import com.cookingnote.app.data.remote.datasource.DefaultRemoteDataSource
+import com.cookingnote.app.data.remote.datasource.RemoteDataSource
 import com.cookingnote.app.data.repository.CookbookRepository
 import com.cookingnote.app.data.seed.SeedData
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +52,50 @@ class AppContainer(context: Context) {
 
     val userPrefs = UserPrefsStore(appContext)
     val aiSettings = AiSettingsStore(appContext)
+    val userSession = com.cookingnote.app.data.prefs.UserSessionStore(appContext)
+
+    private val moshi = com.squareup.moshi.Moshi.Builder()
+        .addLast(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+        .build()
+
+    private val authOkHttpClient: okhttp3.OkHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val requestBuilder = chain.request().newBuilder()
+                val token = userSession.session.value.token
+                if (!token.isNullOrBlank()) {
+                    requestBuilder.addHeader("Authorization", "Bearer $token")
+                }
+                chain.proceed(requestBuilder.build())
+            }
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
+
+    private val backendBaseUrl: String
+        get() = "http://10.0.2.2:8080/"
+
+    private val retrofit: retrofit2.Retrofit by lazy {
+        retrofit2.Retrofit.Builder()
+            .baseUrl(backendBaseUrl)
+            .client(authOkHttpClient)
+            .addConverterFactory(retrofit2.converter.moshi.MoshiConverterFactory.create(moshi))
+            .build()
+    }
+
+    private val recipeApiService: com.cookingnote.app.data.remote.api.RecipeApiService by lazy {
+        retrofit.create(com.cookingnote.app.data.remote.api.RecipeApiService::class.java)
+    }
+
+    private val authApiService: com.cookingnote.app.data.remote.api.AuthApiService by lazy {
+        retrofit.create(com.cookingnote.app.data.remote.api.AuthApiService::class.java)
+    }
+
+    val remoteDataSource: RemoteDataSource = DefaultRemoteDataSource(
+        apiService = recipeApiService,
+        authApiService = authApiService
+    )
 
     val repository = CookbookRepository(
         recipeDao = database.recipeDao,
@@ -60,7 +106,8 @@ class AppContainer(context: Context) {
         historyDao = database.historyDao,
         tagDao = database.tagDao,
         aiLogDao = database.aiLogDao,
-        chatDao = database.chatDao
+        chatDao = database.chatDao,
+        remoteDataSource = remoteDataSource
     )
 
     val aiService: AiService = DefaultAiService(
@@ -73,6 +120,18 @@ class AppContainer(context: Context) {
 
     init {
         refreshCloudConfig()
+        ensurePantrySeeded()
+    }
+
+    private fun ensurePantrySeeded() {
+        scope.launch {
+            runCatching {
+                // Chỉ bổ sung nếu DB đã tồn tại công thức từ trước nhưng pantry bị rỗng (tránh race condition với onCreate)
+                if (database.recipeDao.observeAllSnapshot().isNotEmpty() && database.pantryDao.getAll().isEmpty()) {
+                    SeedData.pantry.forEach { database.pantryDao.upsert(it) }
+                }
+            }
+        }
     }
 
     /**

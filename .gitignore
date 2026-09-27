@@ -61,6 +61,7 @@ Desktop.ini
 **/api_keys.properties
 .env
 .env.*
+!.env.example
 
 # Room schemas (keep if wanted for migrations — currently ignore generated dumps under build)
 # app/schemas/ is intentionally tracked when present
@@ -74,3 +75,4 @@ Desktop.ini
 *.db
 *.db-*
 cn*.db
+~$*

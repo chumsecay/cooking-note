@@ -22,6 +22,7 @@ class Milestone3ArchitectureConformanceTest {
 
     private val expectedScreenFiles = listOf(
         "AiScreen.kt",
+        "AuthScreen.kt",
         "CreateRecipeScreen.kt",
         "DetailScreen.kt",
         "FavoritesScreen.kt",
@@ -57,7 +58,7 @@ class Milestone3ArchitectureConformanceTest {
             ?.sorted()
             ?: emptyList()
 
-        assertEquals("Expected exactly 10 screen files", expectedScreenFiles.sorted(), actualFiles)
+        assertEquals("Expected exactly 11 screen files", expectedScreenFiles.sorted(), actualFiles)
     }
 
     @Test
@@ -146,7 +147,8 @@ class Milestone3ArchitectureConformanceTest {
             "SearchScreen.kt" to ("SearchContent" to "SearchUiState"),
             "SettingsScreen.kt" to ("SettingsContent" to "SettingsUiState"),
             "AiScreen.kt" to ("AiContent" to "AiUiState"),
-            "CreateRecipeScreen.kt" to ("CreateRecipeContent" to "CreateRecipeUiState")
+            "CreateRecipeScreen.kt" to ("CreateRecipeContent" to "CreateRecipeUiState"),
+            "AuthScreen.kt" to ("AuthContent" to "AuthUiState")
         )
 
         for ((fileName, pair) in screenPairs) {
@@ -214,7 +216,8 @@ class Milestone3ArchitectureConformanceTest {
             "Route.Search.path",
             "Route.Create.path",
             "Route.Detail.path",
-            "Route.Edit.path"
+            "Route.Edit.path",
+            "Route.Auth.path"
         )
 
         for (route in destinationRoutes) {

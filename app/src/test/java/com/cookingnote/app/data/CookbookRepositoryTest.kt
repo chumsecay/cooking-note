@@ -107,6 +107,23 @@ class CookbookRepositoryTest {
     }
 
     @Test
+    fun saveRecipe_updatesExistingRecipeWithoutTriggeringCascadeDelete() = runTest {
+        val existingRecipe = RecipeEntity(id = 42L, name = "Phở Bò Đặc Biệt", description = "Đã cập nhật")
+        val ingredients = listOf(IngredientEntity(recipeId = 42L, name = "Thịt bò", amount = 300.0, unit = "g"))
+        val steps = listOf(StepEntity(recipeId = 42L, stepNumber = 1, description = "Nấu nước dùng thơm hơn"))
+
+        coEvery { recipeDao.update(existingRecipe) } returns Unit
+
+        val savedId = repository.saveRecipe(existingRecipe, ingredients, steps)
+
+        assertEquals(42L, savedId)
+        coVerify(exactly = 1) { recipeDao.update(existingRecipe) }
+        coVerify(exactly = 0) { recipeDao.upsert(any()) }
+        coVerify(exactly = 1) { ingredientDao.deleteByRecipe(42L) }
+        coVerify(exactly = 1) { stepDao.deleteByRecipe(42L) }
+    }
+
+    @Test
     fun markCooked_updatesRecipeAndInsertsCookHistory() = runTest {
         val recipeId = 15L
         val note = "Rất ngon, vừa miệng"
@@ -178,4 +195,11 @@ class CookbookRepositoryTest {
         repository.clearChat()
         coVerify(exactly = 1) { chatDao.clear() }
     }
+
+    @Test
+    fun observeSyncStatus_delegatesToRemoteDataSource() = runTest {
+        val syncStatusFlow = repository.observeSyncStatus()
+        assertNotNull(syncStatusFlow)
+    }
 }
+

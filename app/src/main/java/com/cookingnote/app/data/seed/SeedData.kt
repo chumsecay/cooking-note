@@ -267,7 +267,12 @@ object SeedData {
         PantryItemEntity(name = "Hành tím", amount = 5.0, unit = "củ", lowStockThreshold = 2.0),
         PantryItemEntity(name = "Đường", amount = 500.0, unit = "g", lowStockThreshold = 100.0),
         PantryItemEntity(name = "Dầu ăn", amount = 0.8, unit = "lít", lowStockThreshold = 0.2),
-        PantryItemEntity(name = "Cà chua", amount = 4.0, unit = "quả", lowStockThreshold = 2.0)
+        PantryItemEntity(name = "Cà chua", amount = 4.0, unit = "quả", lowStockThreshold = 2.0),
+        PantryItemEntity(name = "Thịt heo ba chỉ", amount = 400.0, unit = "g", lowStockThreshold = 200.0),
+        PantryItemEntity(name = "Đậu hũ trắng", amount = 3.0, unit = "miếng", lowStockThreshold = 1.0),
+        PantryItemEntity(name = "Rau muống", amount = 1.0, unit = "bó", lowStockThreshold = 0.5),
+        PantryItemEntity(name = "Hành lá", amount = 3.0, unit = "nhánh", lowStockThreshold = 1.0),
+        PantryItemEntity(name = "Tiêu xay", amount = 50.0, unit = "g", lowStockThreshold = 10.0)
     )
 
     suspend fun populate(
