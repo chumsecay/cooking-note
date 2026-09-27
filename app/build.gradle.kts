@@ -41,7 +41,7 @@ android {
         buildConfigField("String", "AI_PROVIDER", "\"$aiProvider\"")
         buildConfigField("String", "AI_BASE_URL", "\"$aiBaseUrl\"")
         buildConfigField("String", "AI_MODEL", "\"$aiModel\"")
-        buildConfigField("String", "AI_API_KEY", "\"$aiApiKey\"")
+        buildConfigField("String", "AI_API_KEY", "\"\"")
         buildConfigField("int", "AI_MAX_TOKENS", "$aiMaxTokens")
     }
 

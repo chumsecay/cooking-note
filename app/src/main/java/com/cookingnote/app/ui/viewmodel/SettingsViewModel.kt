@@ -289,6 +289,17 @@ class SettingsViewModel(
             destinationDir.mkdirs()
             val backupFile = File(destinationDir, "cookingnote-backup.db")
             databaseFile.copyTo(backupFile, overwrite = true)
+            val parent = databaseFile.parentFile
+            if (parent != null) {
+                val wal = File(parent, "${databaseFile.name}-wal")
+                if (wal.exists()) {
+                    wal.copyTo(File(destinationDir, "${backupFile.name}-wal"), overwrite = true)
+                }
+                val shm = File(parent, "${databaseFile.name}-shm")
+                if (shm.exists()) {
+                    shm.copyTo(File(destinationDir, "${backupFile.name}-shm"), overwrite = true)
+                }
+            }
             _uiState.update {
                 it.copy(
                     isBackingUp = false,
