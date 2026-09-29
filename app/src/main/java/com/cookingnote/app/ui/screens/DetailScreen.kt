@@ -117,6 +117,7 @@ fun DetailContent(
     modifier: Modifier = Modifier
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showCookedDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -374,7 +375,7 @@ fun DetailContent(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
-                            onClick = onMarkCooked,
+                            onClick = { showCookedDialog = true },
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f)
                         ) { Text("Đã nấu hôm nay") }
@@ -389,6 +390,27 @@ fun DetailContent(
                 }
             }
         }
+    }
+
+    if (showCookedDialog) {
+        AlertDialog(
+            onDismissRequest = { showCookedDialog = false },
+            title = { Text("Đã nấu hôm nay?") },
+            text = { Text("Ghi lại món này vào Lịch sử nấu?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCookedDialog = false
+                        onMarkCooked()
+                    }
+                ) { Text("Ghi lại") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCookedDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
     }
 
     if (showDeleteDialog) {

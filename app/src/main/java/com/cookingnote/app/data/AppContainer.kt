@@ -42,7 +42,8 @@ class AppContainer(context: Context) {
                             ingredientDao = database.ingredientDao,
                             stepDao = database.stepDao,
                             tagDao = database.tagDao,
-                            pantryDao = database.pantryDao
+                            pantryDao = database.pantryDao,
+                            historyDao = database.historyDao
                         )
                     }
                 }

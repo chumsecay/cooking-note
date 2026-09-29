@@ -37,7 +37,7 @@ import com.cookingnote.app.data.util.Converters
         AiQueryLogEntity::class,
         ChatMessageEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

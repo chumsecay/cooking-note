@@ -14,6 +14,7 @@ data class ChatMessageEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val role: String,
     val content: String,
+    val matchedRecipeId: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 ) {
     companion object {

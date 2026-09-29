@@ -81,9 +81,9 @@ class CookbookRepository(
         pantryDao.getAll()
     }
 
-    suspend fun appendMessage(role: String, content: String) = withContext(Dispatchers.IO) {
+    suspend fun appendMessage(role: String, content: String, matchedRecipeId: Long? = null) = withContext(Dispatchers.IO) {
         chatDao.insert(
-            ChatMessageEntity(role = role, content = content)
+            ChatMessageEntity(role = role, content = content, matchedRecipeId = matchedRecipeId)
         )
         Unit
     }

@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -265,6 +269,39 @@ private fun MessageBubble(message: ChatMessageEntity, onOpenRecipe: (Long) -> Un
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = alignment
     ) {
+        // Thẻ món ăn kèm: bấm được để mở chi tiết công thức
+        if (!isUser && message.matchedRecipeId != null) {
+            Card(
+                onClick = { onOpenRecipe(message.matchedRecipeId) },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🍽️", style = MaterialTheme.typography.titleMedium)
+                    Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                        Text(
+                            "Xem công thức",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            "Chạm để mở chi tiết món ăn",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                    Text("›", style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer)
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
         Box(
             modifier = Modifier
                 .widthIn(max = 320.dp)
@@ -306,7 +343,6 @@ private fun MessageBubble(message: ChatMessageEntity, onOpenRecipe: (Long) -> Un
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
         )
     }
-    @Suppress("UNUSED_PARAMETER") val hint = onOpenRecipe
 }
 
 @Composable

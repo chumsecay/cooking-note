@@ -25,12 +25,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -100,6 +102,8 @@ fun SettingsScreen(
             }
         },
         onOpenAuth = onOpenAuth,
+        darkMode = viewModel.darkMode,
+        onSetDarkMode = viewModel::setDarkMode,
         snackbarHostState = snackbarHostState,
         modifier = modifier
     )
@@ -123,6 +127,8 @@ fun SettingsContent(
     onTestAiConnection: () -> Unit = {},
     onBackupDatabase: () -> Unit,
     onOpenAuth: () -> Unit = {},
+    darkMode: kotlinx.coroutines.flow.Flow<Boolean?>? = null,
+    onSetDarkMode: (Boolean?) -> Unit = {},
     snackbarHostState: SnackbarHostState? = null,
     modifier: Modifier = Modifier
 ) {
@@ -163,6 +169,8 @@ fun SettingsContent(
             // --- MỤC 1: TRẢI NGHIỆM & GIAO DIỆN ---
             Text("Giao diện & Hiển thị", style = MaterialTheme.typography.titleMedium)
             Card(modifier = Modifier.fillMaxWidth()) {
+                val darkModeState = darkMode?.collectAsStateWithLifecycle(initialValue = null)
+                val darkModeValue: Boolean? = darkModeState?.value
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -175,11 +183,20 @@ fun SettingsContent(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Chế độ tối", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "Tự động theo hệ thống thiết bị",
+                                if (darkModeValue == null) "Tự động theo hệ thống thiết bị"
+                                else if (darkModeValue == true) "Đang bật chế độ tối"
+                                else "Đang bật chế độ sáng",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        Switch(
+                            checked = darkModeValue == true,
+                            onCheckedChange = { checked ->
+                                // null -> true: từ auto sang ép tối; toggle off quay về auto
+                                onSetDarkMode(if (checked) true else if (darkModeValue == true) false else null)
+                            }
+                        )
                     }
 
                     Row(

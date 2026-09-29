@@ -157,8 +157,12 @@ class AiViewModel(
                 val suggestion = aiService.chat(trimmed, history)
                 val responseContent = suggestion.detail ?: suggestion.summary
 
-                // 4. Record assistant response
-                repository.appendMessage(ChatMessageEntity.ROLE_ASSISTANT, responseContent)
+                // 4. Record assistant response (with recipe link if any)
+                repository.appendMessage(
+                    ChatMessageEntity.ROLE_ASSISTANT,
+                    responseContent,
+                    suggestion.matchedRecipe?.id
+                )
             } catch (e: Exception) {
                 val errorText = "Lỗi: ${e.message ?: "không xác định"}"
                 repository.appendMessage(ChatMessageEntity.ROLE_ASSISTANT, errorText)

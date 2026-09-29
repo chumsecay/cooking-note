@@ -46,7 +46,12 @@ class AppViewModelFactory(
                 SearchViewModel(container.repository) as T
 
             modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
-                SettingsViewModel(container.aiSettings, container.databaseFile(), aiService = container.aiService) as T
+                SettingsViewModel(
+                    container.aiSettings,
+                    container.databaseFile(),
+                    userPrefs = container.userPrefs,
+                    aiService = container.aiService
+                ) as T
 
             modelClass.isAssignableFrom(AiViewModel::class.java) ->
                 AiViewModel(container.aiService, container.aiSettings, container.repository) as T

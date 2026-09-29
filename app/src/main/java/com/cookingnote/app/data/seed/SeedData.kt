@@ -1,12 +1,14 @@
 package com.cookingnote.app.data.seed
 
 import com.cookingnote.app.data.dao.CategoryDao
+import com.cookingnote.app.data.dao.HistoryDao
 import com.cookingnote.app.data.dao.IngredientDao
 import com.cookingnote.app.data.dao.PantryDao
 import com.cookingnote.app.data.dao.RecipeDao
 import com.cookingnote.app.data.dao.StepDao
 import com.cookingnote.app.data.dao.TagDao
 import com.cookingnote.app.data.entity.CategoryEntity
+import com.cookingnote.app.data.entity.CookHistoryEntity
 import com.cookingnote.app.data.entity.IngredientEntity
 import com.cookingnote.app.data.entity.PantryItemEntity
 import com.cookingnote.app.data.entity.RecipeEntity
@@ -256,6 +258,114 @@ object SeedData {
                 "Rắc hành tiêu trước khi ăn."
             ),
             tags = listOf("ấm bụng", "gia đình")
+        ),
+        SeedRecipe(
+            name = "Trứng chiên hành",
+            description = "Món ăn quốc dân nhanh gọn, thơm nức mùi hành lá.",
+            category = "Món nhanh",
+            prepTime = 5, cookTime = 5, servings = 2, difficulty = 1,
+            ingredients = listOf(
+                Triple("Trứng gà", 3.0, "quả"),
+                Triple("Hành lá", 2.0, "nhánh"),
+                Triple("Nước mắm", 1.0, "muỗng")
+            ),
+            steps = listOf(
+                "Đập trứng ra bát, cắt nhỏ hành lá, thêm nước mắm rồi đánh đều.",
+                "Đun nóng dầu ăn trong chảo, đổ trứng vào chiên vàng hai mặt."
+            ),
+            tags = listOf("nhanh", "dễ", "tiết kiệm")
+        ),
+        SeedRecipe(
+            name = "Salad ức gà sốt mè rang",
+            description = "Món ăn thanh nhẹ, giàu đạm dành cho thực đơn ăn kiêng lành mạnh.",
+            category = "Món nhanh",
+            prepTime = 15, cookTime = 10, servings = 2, difficulty = 2,
+            ingredients = listOf(
+                Triple("Ức gà", 250.0, "g"),
+                Triple("Xà lách", 150.0, "g"),
+                Triple("Cà chua bi", 10.0, "quả"),
+                Triple("Dưa leo", 1.0, "quả"),
+                Triple("Sốt mè rang", 3.0, "muỗng"),
+                Triple("Dầu ô liu", 1.0, "muỗng"),
+                Triple("Tiêu xay", 0.5, "muỗng")
+            ),
+            steps = listOf(
+                "Áp chảo ức gà với chút dầu ô liu và tiêu đến khi chín vàng, xé miếng vừa ăn.",
+                "Rửa sạch xà lách, cà chua bi cắt đôi, dưa leo cắt lát mỏng.",
+                "Bày rau ra đĩa, xếp ức gà lên trên và rưới đều sốt mè rang trước khi thưởng thức."
+            ),
+            tags = listOf("healthy", "eatclean", "protein")
+        ),
+        SeedRecipe(
+            name = "Cà phê muối xứ Huế",
+            description = "Vị đậm đà của cà phê phin quyện cùng lớp kem muối béo ngậy đặc trưng.",
+            category = "Đồ uống",
+            prepTime = 10, cookTime = 5, servings = 1, difficulty = 1,
+            ingredients = listOf(
+                Triple("Cà phê phin", 25.0, "g"),
+                Triple("Sữa đặc", 30.0, "ml"),
+                Triple("Kem béo thực vật", 40.0, "ml"),
+                Triple("Muối tinh", 0.5, "g"),
+                Triple("Đá viên", 5.0, "viên")
+            ),
+            steps = listOf(
+                "Pha cà phê bằng phin truyền thống với nước sôi 95 độ C.",
+                "Đánh bông nhẹ kem béo với muối tinh và sữa đặc tạo thành lớp kem muối.",
+                "Rót cà phê vào ly đá, nhẹ nhàng đổ lớp kem muối lên trên cùng."
+            ),
+            tags = listOf("đồ uống", "cà phê", "đặc sản"),
+            favorite = true
+        ),
+        SeedRecipe(
+            name = "Súp nấm hạt sen chay",
+            description = "Món khai vị thanh đạm, bùi bùi hạt sen cùng vị ngọt tự nhiên của các loại nấm.",
+            category = "Món chay",
+            prepTime = 20, cookTime = 25, servings = 4, difficulty = 2,
+            ingredients = listOf(
+                Triple("Hạt sen tươi", 100.0, "g"),
+                Triple("Nấm hương tươi", 80.0, "g"),
+                Triple("Nấm đùi gà", 100.0, "g"),
+                Triple("Bắp ngọt", 1.0, "trái"),
+                Triple("Bột năng", 2.0, "muỗng"),
+                Triple("Ngò rí", 1.0, "nhánh"),
+                Triple("Hạt nêm chay", 1.5, "muỗng")
+            ),
+            steps = listOf(
+                "Luộc hạt sen và bắp ngọt đến khi chín mềm ngọt nước.",
+                "Thái nhỏ nấm hương và nấm đùi gà, cho vào nồi nấu cùng hạt sen.",
+                "Hòa tan bột năng với nước lạnh rồi từ từ khuấy vào nồi tạo độ sánh mịn.",
+                "Nêm hạt nêm chay vừa khẩu vị, tắt bếp và rắc ngò rí thái nhỏ."
+            ),
+            tags = listOf("chay", "thanh đạm", "ấm bụng")
+        ),
+        SeedRecipe(
+            name = "Bò kho bánh mì nước dừa thơm béo chuẩn vị miền Nam",
+            description = "Thịt bắp bò mềm rục ngấm đượm sả quế, nước sốt sánh vàng óng ánh ăn kèm bánh mì giòn rụm.",
+            category = "Món chính",
+            prepTime = 30, cookTime = 90, servings = 6, difficulty = 3,
+            ingredients = listOf(
+                Triple("Bắp bò", 700.0, "g"),
+                Triple("Cà rốt", 2.0, "củ"),
+                Triple("Nước dừa tươi", 500.0, "ml"),
+                Triple("Sả", 4.0, "cây"),
+                Triple("Gừng", 30.0, "g"),
+                Triple("Bột gia vị bò kho", 1.0, "gói"),
+                Triple("Hành tím", 4.0, "củ"),
+                Triple("Tỏi", 5.0, "tép"),
+                Triple("Dầu điều", 2.0, "muỗng"),
+                Triple("Nước mắm", 3.0, "muỗng"),
+                Triple("Bánh mì", 4.0, "ổ")
+            ),
+            steps = listOf(
+                "Thái bắp bò quân cờ, ướp với gia vị bò kho, sả đập dập, tỏi hành băm và nước mắm 45 phút.",
+                "Phi thơm dầu điều, xào săn thịt bò trên lửa lớn cho ngấm màu đẹp mắt.",
+                "Đổ nước dừa tươi vào nồi, đun sôi rồi hạ nhỏ lửa hầm khoảng 60 phút cho thịt mềm.",
+                "Thêm cà rốt tỉa hoa vào hầm thêm 15 phút đến khi cà rốt vừa chín tới.",
+                "Hòa chút bột năng tạo độ sánh nhẹ cho nước sốt bò kho.",
+                "Múc bò kho ra tô, rắc rau húng quế và ớt tươi.",
+                "Thưởng thức nóng hổi kèm bánh mì giòn hoặc hủ tiếu."
+            ),
+            tags = listOf("nam", "bò", "đậm đà", "tiệc", "gia đình")
         )
     )
 
@@ -272,7 +382,10 @@ object SeedData {
         PantryItemEntity(name = "Đậu hũ trắng", amount = 3.0, unit = "miếng", lowStockThreshold = 1.0),
         PantryItemEntity(name = "Rau muống", amount = 1.0, unit = "bó", lowStockThreshold = 0.5),
         PantryItemEntity(name = "Hành lá", amount = 3.0, unit = "nhánh", lowStockThreshold = 1.0),
-        PantryItemEntity(name = "Tiêu xay", amount = 50.0, unit = "g", lowStockThreshold = 10.0)
+        PantryItemEntity(name = "Tiêu xay", amount = 50.0, unit = "g", lowStockThreshold = 10.0),
+        PantryItemEntity(name = "Tiêu đen hạt", amount = 5.0, unit = "g", lowStockThreshold = 20.0),
+        PantryItemEntity(name = "Bơ lạt", amount = 50.0, unit = "g", lowStockThreshold = 100.0),
+        PantryItemEntity(name = "Sữa đặc", amount = 1.0, unit = "hộp", lowStockThreshold = 0.5)
     )
 
     suspend fun populate(
@@ -281,7 +394,8 @@ object SeedData {
         ingredientDao: IngredientDao,
         stepDao: StepDao,
         tagDao: TagDao,
-        pantryDao: PantryDao
+        pantryDao: PantryDao,
+        historyDao: HistoryDao? = null
     ) {
         val categoryIds = mutableMapOf<String, Long>()
         categories.forEach { cat ->
@@ -293,6 +407,7 @@ object SeedData {
             tagIds[tag] = tagDao.upsert(TagEntity(name = tag))
         }
 
+        val insertedRecipeIds = mutableMapOf<String, Long>()
         recipes.forEach { seed ->
             val recipeId = recipeDao.upsert(
                 RecipeEntity(
@@ -306,6 +421,7 @@ object SeedData {
                     isFavorite = seed.favorite
                 )
             )
+            insertedRecipeIds[seed.name] = recipeId
             ingredientDao.upsertAll(
                 seed.ingredients.mapIndexed { index, (name, amount, unit) ->
                     IngredientEntity(
@@ -334,5 +450,38 @@ object SeedData {
         }
 
         pantry.forEach { pantryDao.upsert(it) }
+
+        // Seed 3 historical cook logs so Home stats and History screen have data
+        if (historyDao != null) {
+            val now = System.currentTimeMillis()
+            val oneDayMs = 24L * 60L * 60L * 1000L
+            insertedRecipeIds["Phở bò"]?.let { id ->
+                historyDao.insert(
+                    CookHistoryEntity(
+                        recipeId = id,
+                        cookedAt = now - 2 * oneDayMs,
+                        note = "Nấu cho cả nhà cuối tuần"
+                    )
+                )
+            }
+            insertedRecipeIds["Cơm tấm sườn"]?.let { id ->
+                historyDao.insert(
+                    CookHistoryEntity(
+                        recipeId = id,
+                        cookedAt = now - 1 * oneDayMs,
+                        note = "Sườn ướp ngon vừa miệng"
+                    )
+                )
+            }
+            insertedRecipeIds["Canh chua cá"]?.let { id ->
+                historyDao.insert(
+                    CookHistoryEntity(
+                        recipeId = id,
+                        cookedAt = now - 2 * 60 * 60 * 1000L,
+                        note = "Bữa trưa thanh mát"
+                    )
+                )
+            }
+        }
     }
 }

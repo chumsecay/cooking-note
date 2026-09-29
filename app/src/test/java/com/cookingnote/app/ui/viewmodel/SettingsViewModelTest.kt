@@ -42,7 +42,7 @@ class SettingsViewModelTest {
 
     @Test
     fun uiState_initializesWithLoadedSettings() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(mockStore, tempDbFile, testDispatcher)
+        val viewModel = SettingsViewModel(mockStore, tempDbFile, null, testDispatcher)
         runCurrent()
 
         val state = viewModel.uiState.value
@@ -60,7 +60,7 @@ class SettingsViewModelTest {
             Unit
         }
 
-        val viewModel = SettingsViewModel(mockStore, tempDbFile, testDispatcher)
+        val viewModel = SettingsViewModel(mockStore, tempDbFile, null, testDispatcher)
         runCurrent()
 
         viewModel.onModelChanged("gemini-2.0-flash")
@@ -75,7 +75,7 @@ class SettingsViewModelTest {
 
     @Test
     fun customEndpoint_defaultsToFalse_andTogglingUpdatesState() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(mockStore, tempDbFile, testDispatcher)
+        val viewModel = SettingsViewModel(mockStore, tempDbFile, null, testDispatcher)
         runCurrent()
 
         assertEquals(false, viewModel.uiState.value.isCustomEndpoint)
@@ -93,7 +93,7 @@ class SettingsViewModelTest {
         val mockAi = mockk<com.cookingnote.app.ai.AiService>()
         coEvery { mockAi.testConnection() } returns "Kết nối thành công tới OpenAI!"
 
-        val viewModel = SettingsViewModel(mockStore, tempDbFile, testDispatcher, aiService = mockAi)
+        val viewModel = SettingsViewModel(mockStore, tempDbFile, null, testDispatcher, aiService = mockAi)
         runCurrent()
 
         viewModel.testAiConnection()
@@ -110,7 +110,7 @@ class SettingsViewModelTest {
         val mockAi = mockk<com.cookingnote.app.ai.AiService>()
         coEvery { mockAi.testConnection() } throws RuntimeException("401 Unauthorized")
 
-        val viewModel = SettingsViewModel(mockStore, tempDbFile, testDispatcher, aiService = mockAi)
+        val viewModel = SettingsViewModel(mockStore, tempDbFile, null, testDispatcher, aiService = mockAi)
         runCurrent()
 
         viewModel.testAiConnection()

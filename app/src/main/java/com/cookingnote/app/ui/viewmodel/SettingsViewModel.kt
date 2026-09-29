@@ -60,12 +60,22 @@ data class SettingsUiState(
 class SettingsViewModel(
     private val aiSettingsStore: AiSettingsStore,
     private val databaseFile: File,
+    private val userPrefs: com.cookingnote.app.data.prefs.UserPrefsStore? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val aiService: com.cookingnote.app.ai.AiService? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    /** null = theo hệ thống; true/false = ép tối/sáng. */
+    val darkMode = userPrefs?.darkMode
+        ?: kotlinx.coroutines.flow.MutableStateFlow<Boolean?>(null)
+
+    fun setDarkMode(enabled: Boolean?) {
+        val store = userPrefs ?: return
+        viewModelScope.launch(ioDispatcher) { store.setDarkMode(enabled) }
+    }
 
     private var isFormDirty = false
 

@@ -80,6 +80,45 @@ class RuleBasedAi(
             }
         }
 
+        // ƯU TIÊN 1: match trực tiếp theo tên món / tên nguyên liệu trong prompt
+        val allRecipes = repository.randomRecipes(50)
+        val keywords = lower.split(Regex("[\\s,.?!:;()]+")).filter { it.length >= 3 }
+        if (keywords.isNotEmpty()) {
+            val matched = allRecipes.filter { rec ->
+                val nameLower = rec.name.lowercase()
+                keywords.any { kw -> nameLower.contains(kw) }
+            }
+            val ingredientMatched = if (matched.isEmpty()) {
+                allRecipes.filter { rec ->
+                    val ingNames = repository.getRecipe(rec.id)?.ingredients
+                        ?.map { it.name.lowercase() }.orEmpty()
+                    keywords.any { kw -> ingNames.any { it.contains(kw) } }
+                }
+            } else emptyList()
+            val hits = (matched + ingredientMatched).distinctBy { it.id }
+            if (hits.isNotEmpty()) {
+                val responseText = buildString {
+                    appendLine("🍽 Mình tìm thấy ${hits.size} món phù hợp với \"$prompt\":")
+                    appendLine()
+                    hits.take(3).forEachIndexed { index, rec ->
+                        val time = rec.prepTime + rec.cookTime
+                        val desc = rec.description.ifBlank { "Món ngon từ thư viện." }
+                        appendLine("${index + 1}. **${rec.name}** (⏱ $time phút · 👥 ${rec.servings} người)")
+                        appendLine("   - $desc")
+                    }
+                }
+                return listOf(
+                    AiSuggestion(
+                        title = hits.first().name,
+                        summary = hits.take(3).joinToString(", ") { it.name },
+                        matchedRecipe = hits.first(),
+                        detail = responseText,
+                        source = "rule-based"
+                    )
+                )
+            }
+        }
+
         val all = repository.randomRecipes(20)
         val wantsQuick = lower.contains("nhanh") || lower.contains("15 phút") || lower.contains("10 phút")
         val wantsVegetarian = lower.contains("chay")
