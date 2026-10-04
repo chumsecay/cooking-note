@@ -67,7 +67,7 @@ fun AuthContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (uiState.isLoggedIn) "Hồ sơ tài khoản" else "Tài khoản SmartChef") },
+                title = { Text(if (uiState.isLoggedIn) "Hồ sơ tài khoản" else "Tài khoản Cooking Note") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
@@ -109,7 +109,7 @@ fun AuthContent(
             )
 
             Text(
-                text = "Đồng bộ dữ liệu và đề xuất món ăn thông minh từ máy chủ SmartChef Backend v2",
+                text = "Đồng bộ dữ liệu và đề xuất món ăn thông minh",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -181,7 +181,7 @@ fun AuthContent(
                             )
                             Column {
                                 Text(
-                                    text = uiState.fullName.ifBlank { "Người dùng SmartChef" },
+                                    text = uiState.fullName.ifBlank { "Người dùng Cooking Note" },
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -200,7 +200,7 @@ fun AuthContent(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("Trạng thái:", style = MaterialTheme.typography.bodyMedium)
-                            Text("Đã kết nối máy chủ v2", color = Color(0xFF34C759), fontWeight = FontWeight.SemiBold)
+                            Text("Đã đăng nhập", color = Color(0xFF34C759), fontWeight = FontWeight.SemiBold)
                         }
 
                         if (!uiState.role.isNullOrBlank()) {

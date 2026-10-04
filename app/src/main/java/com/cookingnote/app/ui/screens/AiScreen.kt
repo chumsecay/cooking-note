@@ -318,14 +318,27 @@ private fun MessageBubble(message: ChatMessageEntity, onOpenRecipe: (Long) -> Un
         ) {
             val styledText = remember(message.content) {
                 androidx.compose.ui.text.buildAnnotatedString {
-                    val parts = message.content.split("**")
-                    parts.forEachIndexed { index, part ->
-                        if (index % 2 == 1) {
-                            pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
-                            append(part)
-                            pop()
+                    val lines = message.content.lines()
+                    lines.forEachIndexed { lineIdx, rawLine ->
+                        val isHeader = rawLine.trimStart().startsWith("#")
+                        val line = if (isHeader) {
+                            rawLine.trimStart().replace(Regex("""^#{1,6}\s*"""), "")
                         } else {
-                            append(part)
+                            rawLine
+                        }
+                        val parts = line.split("**")
+                        parts.forEachIndexed { index, part ->
+                            val isBold = isHeader || (index % 2 == 1)
+                            if (isBold) {
+                                pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
+                                append(part)
+                                pop()
+                            } else {
+                                append(part)
+                            }
+                        }
+                        if (lineIdx < lines.lastIndex) {
+                            append("\n")
                         }
                     }
                 }

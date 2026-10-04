@@ -106,5 +106,13 @@ class DefaultAiServiceTest {
         assertEquals("AI vision chưa cấu hình", result.title)
         assertEquals("rule-based", result.source)
     }
-}
 
+    @Test
+    fun isCloudConfigured_returnsTrue_whenLocalProxyEvenIfKeyBlank() {
+        every { mockSettingsStore.settings } returns MutableStateFlow(
+            AiSettings(provider = AiProviderType.OPENAI_CHAT, baseUrl = "http://localhost:20128/v1", apiKey = "")
+        )
+        val service = DefaultAiService(mockSettingsStore, mockRepository)
+        assertTrue(service.isCloudConfigured)
+    }
+}

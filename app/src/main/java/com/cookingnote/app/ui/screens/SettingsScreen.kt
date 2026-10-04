@@ -145,15 +145,15 @@ fun SettingsContent(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // --- MỤC 0: TÀI KHOẢN SMARTCHEF V2 ---
-            Text("Tài khoản & Đám mây", style = MaterialTheme.typography.titleMedium)
+            // --- MỤC 0: TÀI KHOẢN NGƯỜI DÙNG ---
+            Text("Tài khoản người dùng", style = MaterialTheme.typography.titleMedium)
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        "Đồng bộ công thức và sử dụng trí tuệ nhân tạo đề xuất theo nguyên liệu từ SmartChef Cloud.",
+                        "Quản lý thông tin hồ sơ và trải nghiệm nấu ăn cá nhân hóa.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -161,7 +161,7 @@ fun SettingsContent(
                         onClick = onOpenAuth,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Quản lý tài khoản SmartChef")
+                        Text("Quản lý tài khoản")
                     }
                 }
             }
@@ -351,7 +351,7 @@ fun SettingsContent(
                         OutlinedTextField(
                             value = uiState.apiKey,
                             onValueChange = onApiKeyChanged,
-                            label = { Text("Khóa API (Để trống nếu proxy v2 tự xác thực)") },
+                            label = { Text("Khóa API (Để trống nếu proxy tự xác thực)") },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !uiState.isSaving,
                             singleLine = true,
@@ -472,7 +472,7 @@ fun SettingsContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "Sổ tay Nấu ăn · Cooking Note v2.0",
+                    "Sổ tay Nấu ăn · Cooking Note v1.0",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

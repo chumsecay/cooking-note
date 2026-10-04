@@ -32,19 +32,41 @@ class DefaultAiService(
 
     private val rule = RuleBasedAi(repository)
 
+private fun isLocalProxy(baseUrl: String): Boolean =
+        baseUrl.contains("localhost") ||
+            baseUrl.contains("127.0.0.1") ||
+            baseUrl.contains("10.0.2.2")
+
+    private fun hasKeyOrProxy(settings: AiSettings): Boolean =
+        settings.apiKey.isNotBlank() || isLocalProxy(settings.baseUrl)
+
+    private fun resolveUrl(url: String): String {
+        val isEmulator = runCatching {
+            android.os.Build.FINGERPRINT.startsWith("generic") ||
+                android.os.Build.MODEL.contains("google_sdk") ||
+                android.os.Build.HARDWARE.contains("goldfish") ||
+                android.os.Build.HARDWARE.contains("ranchu")
+        }.getOrDefault(false)
+        return if (isEmulator && (url.contains("://localhost:") || url.contains("://127.0.0.1:"))) {
+            url.replace("://localhost:", "://10.0.2.2:").replace("://127.0.0.1:", "://10.0.2.2:")
+        } else {
+            url
+        }
+    }
+
     override val providerLabel: String
         get() = settingsStore.settings.value.provider.label
 
     override val isCloudConfigured: Boolean
         get() = settingsStore.settings.value.provider != AiProviderType.RULE_BASED &&
-            settingsStore.settings.value.apiKey.isNotBlank()
+            hasKeyOrProxy(settingsStore.settings.value)
 
     override suspend fun chat(
         prompt: String,
         history: List<Pair<String, String>>
     ): AiSuggestion = withContext(Dispatchers.IO) {
         val settings = settingsStore.settings.value
-        if (settings.provider == AiProviderType.RULE_BASED || settings.apiKey.isBlank()) {
+        if (settings.provider == AiProviderType.RULE_BASED || !hasKeyOrProxy(settings)) {
             return@withContext ruleFallback("AI chưa cấu hình", prompt)
         }
         val systemContext = runCatching { buildSystemContext() }.getOrNull()
@@ -71,7 +93,7 @@ class DefaultAiService(
         if (settings.provider == AiProviderType.RULE_BASED) {
             return@withContext "Chế độ Rule-based (Cục bộ): Không sử dụng kết nối mạng."
         }
-        if (settings.apiKey.isBlank() && settings.provider.requiresApiKey) {
+        if (!hasKeyOrProxy(settings) && settings.provider.requiresApiKey) {
             throw IOException("Chưa nhập API Key cho ${settings.provider.label}.")
         }
         val raw = when (settings.provider) {
@@ -116,6 +138,7 @@ class DefaultAiService(
         sb.appendLine("3. Hướng dẫn công thức nấu: Trình bày rõ ràng gồm Tên món, Nguyên liệu cần chuẩn bị, Thời gian nấu và các Bước thực hiện ngắn gọn, dễ làm.")
         sb.appendLine("4. Văn phong: Tự nhiên, nhiệt tình, gần gũi, dùng tiếng Việt chuẩn mực.")
         sb.appendLine("5. Trả lời trực tiếp, cô đọng, đi thẳng vào món ăn và công thức, không suy nghĩ hay diễn giải dài dòng.")
+        sb.appendLine("6. Không dùng ký tự tiêu đề markdown (#, ##, ###). Trình bày tiêu đề và tên món bằng chữ in đậm (**Tên món**), gạch đầu dòng (-) hoặc số thứ tự (1, 2, 3).")
         return sb.toString().trim()
     }
 
@@ -130,7 +153,7 @@ class DefaultAiService(
                 )
             }
             val settings = settingsStore.settings.value
-            if (settings.provider == AiProviderType.RULE_BASED || settings.apiKey.isBlank()) {
+            if (settings.provider == AiProviderType.RULE_BASED || !hasKeyOrProxy(settings)) {
                 return@withContext local
             }
             val prompt = "Gợi ý 5 món từ nguyên liệu: ${ingredients.joinToString(", ")}. " +
@@ -146,7 +169,7 @@ class DefaultAiService(
     override suspend fun suggestFromImage(imageBytes: ByteArray): AiSuggestion =
         withContext(Dispatchers.IO) {
             val settings = settingsStore.settings.value
-            if (settings.provider == AiProviderType.RULE_BASED || settings.apiKey.isBlank()) {
+            if (settings.provider == AiProviderType.RULE_BASED || !hasKeyOrProxy(settings)) {
                 return@withContext AiSuggestion(
                     title = "AI vision chưa cấu hình",
                     summary = "Thêm API key để dùng nhận diện ảnh.",
@@ -470,8 +493,9 @@ class DefaultAiService(
         useBearer: Boolean,
         extraHeaders: Map<String, String> = emptyMap()
     ): String {
+        val resolvedUrl = resolveUrl(url)
         val requestBuilder = Request.Builder()
-            .url(url)
+            .url(resolvedUrl)
             .addHeader("Content-Type", "application/json")
         if (apiKey.isNotBlank()) {
             if (useBearer) requestBuilder.addHeader("Authorization", "Bearer $apiKey")

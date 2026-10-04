@@ -79,11 +79,11 @@ fun CookingNoteRoot(
     val session by container.userSession.session.collectAsStateWithLifecycle()
 
     LaunchedEffect(session.isLoggedIn) {
-        if (!session.isLoggedIn) {
+        if (session.isLoggedIn) {
             val currentRoute = nav.currentBackStackEntry?.destination?.route
-            if (currentRoute != null && currentRoute != Route.Auth.path) {
-                nav.navigate(Route.Auth.path) {
-                    popUpTo(0) { inclusive = true }
+            if (currentRoute == Route.Auth.path) {
+                nav.navigate(Route.Home.path) {
+                    popUpTo(Route.Auth.path) { inclusive = true }
                 }
             }
         }
@@ -131,7 +131,7 @@ private fun AppNavHost(
 ) {
     NavHost(
         navController = nav,
-        startDestination = if (isLoggedIn) Route.Home.path else Route.Auth.path,
+        startDestination = Route.Home.path,
         modifier = Modifier.padding(padding)
     ) {
         composable(Route.Home.path) {
