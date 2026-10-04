@@ -1,51 +1,110 @@
-# Cooking Note — Hướng dẫn cho agent
+# Cooking Note — Hướng dẫn Thống nhất cho AI Agents
 
-## Build và kiểm chứng
+> **Tài liệu quy chuẩn dành cho mọi AI Agent (Claude Code, OpenAI Codex, Gemini Antigravity, ARTEMIS, v.v.) khi làm việc trên dự án Cooking Note.**
 
-- Chạy từ root repo; chỉ có module Android `:app`. Dùng Gradle wrapper (hiện 9.3.0), không dùng Gradle hệ thống. Cần JDK chạy được wrapper và Android SDK 35; JVM target 17 không đồng nghĩa wrapper chạy được trên Java 17. Đường dẫn SDK nằm trong `local.properties` (không commit).
-- Lệnh Windows PowerShell dưới đây; macOS/Linux thay `.\gradlew.bat` bằng `./gradlew`:
+---
 
-```powershell
-.\gradlew.bat :app:compileDebugKotlin
-.\gradlew.bat :app:testDebugUnitTest
-.\gradlew.bat :app:testDebugUnitTest --tests "com.cookingnote.app.ui.viewmodel.HomeViewModelTest"
-.\gradlew.bat :app:testDebugUnitTest --tests "com.cookingnote.app.Milestone3*"
-.\gradlew.bat :app:lintDebug
-.\gradlew.bat :app:assembleDebug
+## 1. Tổng quan Dự án & Môi trường Kỹ thuật
+
+- **Nền tảng:** Android ứng dụng đơn module (`:app`), ngôn ngữ Kotlin 2.0.21.
+- **SDK & JVM:** `compileSdk = 35`, `minSdk = 26`, `targetSdk = 35`, JVM Target 17.
+- **Build tool:** Gradle Wrapper 9.3.0 (chạy từ thư mục gốc, dùng `./gradlew` hoặc `.\gradlew.bat`).
+- **Giao diện:** 100% Jetpack Compose Material 3 kết hợp hệ thống Material Icons và Vector Graphics.
+- **Cơ sở dữ liệu:** Room 2.6.1, database `cookingnote.db`, **Schema Version 3** (10 Entities, 9 DAOs).
+- **Lưu trữ bảo mật:** `EncryptedSharedPreferences` (AES-256-GCM qua Android Keystore).
+
+---
+
+## 2. Lệnh Build, Kiểm thử & Kiểm tra Chất lượng
+
+Tất cả lệnh chạy từ thư mục gốc repo. Trên Windows PowerShell dùng `.\gradlew.bat`, trên Linux/macOS/Git Bash dùng `./gradlew`:
+
+```bash
+# Kiểm tra biên dịch và kiểu dữ liệu Kotlin
+./gradlew :app:compileDebugKotlin
+
+# Chạy toàn bộ 135 unit test tự động trên JVM (~11-15s, không cần emulator)
+./gradlew :app:testDebugUnitTest
+
+# Chạy kiểm thử đơn vị cho một lớp cụ thể
+./gradlew :app:testDebugUnitTest --tests "com.cookingnote.app.ui.viewmodel.HomeViewModelTest"
+./gradlew :app:testDebugUnitTest --tests "com.cookingnote.app.Milestone3*"
+
+# Kiểm tra tĩnh mã nguồn (Lint)
+./gradlew :app:lintDebug
+
+# Đóng gói APK Debug (đầu ra: app/build/outputs/apk/debug/app-debug.apk)
+./gradlew :app:assembleDebug
 ```
 
-- `compileDebugKotlin` kiểm tra biên dịch/kiểu; không có task typecheck/formatter riêng được cấu hình. Unit test chạy JVM, không cần emulator nhưng vẫn cần Android SDK để build.
-- Báo cáo: `app/build/reports/tests/testDebugUnitTest/index.html`, `app/build/reports/lint-results-debug.html`. APK: `app/build/outputs/apk/debug/app-debug.apk`.
-- Thêm/nâng dependency qua `gradle/libs.versions.toml`; repository Maven khai báo ở `settings.gradle.kts` vì bật `FAIL_ON_PROJECT_REPOS`.
+- Báo cáo kết quả kiểm thử: `app/build/reports/tests/testDebugUnitTest/index.html`.
+- Báo cáo Lint: `app/build/reports/lint-results-debug.html`.
+- Quản lý dependency tập trung tại `gradle/libs.versions.toml`.
 
-## Wiring cần giữ
+---
 
-Các đường dẫn Kotlin dưới đây tương đối với `app/src/main/java/com/cookingnote/app/`.
+## 3. Quy chuẩn Kiến trúc Bắt buộc (Wiring Rules)
 
-- `CookingNoteApp` tạo `data/AppContainer`; `MainActivity` mở `ui/CookingNoteRoot`. Giữ manual DI qua `LocalAppContainer` và `AppViewModelFactory`, không thêm Hilt/Koin.
-- Screen lấy ViewModel, thu state bằng `collectAsStateWithLifecycle()`, truyền UI state tường minh và callback xuống `*Content` stateless. Không gọi Repository/DAO/AI trực tiếp trong Composable. README còn ghi `collectAsState`: không làm theo đoạn đó.
-- Thêm/đổi màn hình phải đồng bộ `ui/Routes.kt`, `ui/CookingNoteRoot.kt`, `ui/viewmodel/AppViewModelFactory.kt` và tests Milestone3. Create/Edit dùng chung editor; giữ `recipeId`, `NavType.LongType` và key ViewModel theo ID để tránh tái sử dụng state của công thức khác.
-- Chuỗi UI dùng tiếng Việt. Giữ API key trong `data/prefs/AiSettingsStore.kt` (EncryptedSharedPreferences), không chuyển sang DataStore/plaintext.
-- AI thực tế ở `ai/DefaultAiService.kt`: OkHttp đồng bộ trên IO và JSON viết tay, không phải Retrofit service dù dependency có sẵn. Giữ fallback `RuleBasedAi` và `java.util.Base64` để tương thích JVM tests.
-- Cloud AI cấu hình sẵn duy nhất ở `data/prefs/AiCloudDefaults.kt` (provider/baseUrl/model + `REMOTE_CONFIG_URL`); không hard-code key. `data/prefs/AiRemoteConfig.kt` tải JSON từ xa, merge đè baked defaults, offline-first; JSON không chứa apiKey.
+Đường dẫn tương đối với `app/src/main/java/com/cookingnote/app/`:
 
-## Bẫy kiểm thử
+1. **Dependency Injection (Thủ công / Manual DI):**
+   - `CookingNoteApp` khởi tạo duy nhất `data/AppContainer`.
+   - `MainActivity` cung cấp container qua `LocalAppContainer` CompositionLocal.
+   - Tạo ViewModel qua `ui/viewmodel/AppViewModelFactory`.
+   - **Tuyệt đối KHÔNG thêm Hilt, Dagger hoặc Koin** để giữ kiến trúc tối giản và tương thích kiểm thử.
+2. **Luồng dữ liệu một chiều (UDF) & Quản lý Trạng thái:**
+   - Màn hình (`*Screen`) lấy ViewModel, thu thập state qua `collectAsStateWithLifecycle()`.
+   - Tách biệt rõ ràng: Screen Composable điều phối logic -> truyền UI State bất biến và lambda callback xuống `*Content` stateless.
+   - **Không gọi Repository, DAO hoặc AI Service trực tiếp trong Composable.**
+   - Khi thêm hoặc chỉnh sửa màn hình, phải đồng bộ:
+     + `ui/Routes.kt`
+     + `ui/CookingNoteRoot.kt`
+     + `ui/viewmodel/AppViewModelFactory.kt`
+     + Các bài kiểm thử kiến trúc trong `Milestone3ArchitectureConformanceTest`.
+3. **Quản lý Định danh & Điều hướng:**
+   - Màn hình Tạo/Sửa công thức dùng chung `CreateRecipeScreen`, phân biệt bằng `recipeId: Long` (`NavType.LongType`). Key ViewModel theo `recipeId` để tránh tái sử dụng sai state.
+4. **Bảo mật & Cấu hình Phiên:**
+   - API Key AI và Session Token lưu trong `data/prefs/AiSettingsStore.kt` và `UserSessionStore.kt` qua `EncryptedSharedPreferences`.
+   - `AndroidManifest.xml` tắt `android:allowBackup="false"` để tránh rủi ro giải mã MasterKey khi khôi phục thiết bị.
+   - Sao lưu CSDL SQLite trong `SettingsViewModel` sao chép cả file chính kèm file WAL (`.db-wal`) và SHM (`.db-shm`) để bảo toàn giao dịch.
 
-- `app/src/test/java/com/cookingnote/app/Milestone3ArchitectureConformanceTest.kt` và `Milestone3ChallengerAdversarialTest.kt` đọc source bằng chuỗi/regex, không kiểm thử Compose runtime. Chúng cố định danh sách file screen, wiring factory, tên state và cả một số định dạng code; refactor hợp lệ vẫn có thể làm fail.
-- Không thêm file helper `.kt` vào `ui/screens/` mà quên cập nhật danh sách test. Parser chữ ký `*Content` dừng ở dấu `)` đầu tiên: đặt tham số `uiState` trước callback. Kiểm tra cả literal `collectAsStateWithLifecycle()` và tên/format khai báo ViewModel khi sửa wiring.
-- ViewModel tests dùng `testutil/MainDispatcherRule` (mặc định `UnconfinedTestDispatcher`), MockK và Turbine. Với `SharingStarted.WhileSubscribed`, phải có subscriber mới kích hoạt upstream; không chỉ đọc `.value` rồi chờ scheduler.
-- `unitTests.isReturnDefaultValues = true`: Android framework stub có thể trả 0/null/false; test xanh không chứng minh hành vi thiết bị. Dùng dispatcher/scheduler chung khi inject IO trong test (xem `SettingsViewModelTest`).
+---
 
-## Dữ liệu và điểm cần rà soát trước khi đưa vào sử dụng
+## 4. Dữ liệu & Trí tuệ Nhân tạo (Room DB & AI Engine)
 
-- Room là `data/database/RoomDatabase.kt`, DB `cookingnote.db`, version 2. KSP xuất schema vào `app/schemas/`; giữ schema trong git, không sửa code sinh trong `app/build/`.
-- `data/AppContainer.kt` vẫn dùng `fallbackToDestructiveMigration()`, chưa đăng ký migration bảo toàn dữ liệu. Khi thay schema hoặc chuẩn bị nâng cấp bản đã cài, viết/test migration thay vì dựa vào fallback xóa dữ liệu.
-- Seed chạy bất đồng bộ trong callback tạo DB; tạo container không có nghĩa seed đã xong. Sửa `SeedData` không cập nhật DB đã tồn tại.
-- `ui/viewmodel/SettingsViewModel.kt` chỉ copy file DB đang mở, chưa checkpoint/đồng bộ ghi: không coi đây là snapshot SQLite nhất quán khi dùng WAL. Không bao gồm preferences/API settings; test copy file không chứng minh backup có thể restore.
-- `app/src/main/AndroidManifest.xml` bật `allowBackup` nhưng chưa có quy tắc loại trừ encrypted preferences; cần rà soát backup/restore với MasterKey trước phát hành.
-- Khi sửa AI, kiểm tra JSON request/response thực tế: mã hiện ghép/parse bằng chuỗi. Rà soát lỗi/log trong `DefaultAiService` trước phát hành; Gemini đặt key trong URL và exception có thể chứa body phản hồi provider.
+1. **Room Database Version 3:**
+   - Quản lý 10 thực thể: `RecipeEntity`, `IngredientEntity`, `StepEntity`, `CategoryEntity`, `PantryItemEntity`, `CookHistoryEntity`, `TagEntity`, `RecipeTagCrossRef`, `ChatMessageEntity` (chứa `matchedRecipeId`), `AiQueryLogEntity`.
+   - File schema JSON xuất tại `app/schemas/` được theo dõi trong Git. Không chỉnh sửa code Room sinh tự động trong `app/build/`.
+2. **Dữ liệu Khởi tạo (SeedData):**
+   - Nạp tự động trong `AppContainer` qua `SeedData.populate` khi tạo database.
+   - Gồm: 21 công thức món ăn (đầy đủ 5 danh mục kèm `notes` mẹo nấu), 25 nguyên liệu tủ lạnh (có `expiryDate` và `lowStockThreshold`), 5 bản ghi lịch sử nấu, và tin nhắn mẫu cho AI.
+3. **Phân hệ AI Đa tầng (Multi-Provider AI):**
+   - Triển khai tại `ai/DefaultAiService.kt`, hỗ trợ 4 nhà cung cấp: OpenAI Chat, OpenAI Responses, Anthropic Claude, Google Gemini.
+   - Cơ chế fail-safe: Khi không có kết nối mạng hoặc chưa cấu hình API key, hệ thống tự động chuyển sang `RuleBasedAi` để gợi ý món ăn cục bộ dựa trên nguyên liệu tủ lạnh, không gây crash ứng dụng.
+   - Cấu hình đám mây mặc định tại `data/prefs/AiCloudDefaults.kt`; nạp remote config qua `data/prefs/AiRemoteConfig.kt` mà không chứa API key trong JSON.
 
-## Tài liệu
+---
 
-- `README.md` mô tả tính năng/cấu hình AI; `ORIGINAL_REQUEST.md` chứa tiêu chí refactor gốc. Khi mâu thuẫn, ưu tiên cấu hình build và source hiện tại; không suy ra production-ready chỉ từ mô tả tính năng hoặc unit test.
-- `AGENT.md` là bản sao của file này; khi chỉnh sửa phải đồng bộ nội dung hai file.
+## 5. Bẫy Kiểm thử Cần Lưu ý (Testing Gotchas)
+
+- **Kiểm tra cú pháp chuỗi tĩnh:** `Milestone3ArchitectureConformanceTest.kt` và `Milestone3ChallengerAdversarialTest.kt` phân tích mã nguồn bằng chuỗi và Regex:
+  + Không tự ý tạo thêm file helper `.kt` trong `ui/screens/` mà chưa cập nhật danh sách kiểm tra trong test.
+  + Trong hàm `*Content`, tham số `uiState` bắt buộc phải đặt trước các lambda callback (vì parser dừng ở dấu ngoặc `)` đầu tiên).
+  + Luôn giữ nguyên literal `collectAsStateWithLifecycle()`.
+- **Coroutine & ViewModel Testing:**
+  + Sử dụng `testutil/MainDispatcherRule` (mặc định `UnconfinedTestDispatcher`), MockK và Turbine.
+  + Với StateFlow dùng `SharingStarted.WhileSubscribed`, phải có subscriber lắng nghe (ví dụ qua Turbine `.test { ... }`) trước khi đọc giá trị state.
+
+---
+
+## 6. Hướng dẫn Dành cho Tự động hóa Thiết bị (ARTEMIS / UI Automator)
+
+- **Cài đặt & Khởi chạy:**
+  1. Build APK: `./gradlew :app:assembleDebug`.
+  2. Cài đặt vào thiết bị/emulator: `adb install -r app/build/outputs/apk/debug/app-debug.apk`.
+  3. Khởi chạy ứng dụng: `adb shell am start -n com.cookingnote.app/.MainActivity`.
+- **Làm mới dữ liệu kiểm thử (Clean Re-seed):**
+  - Chạy lệnh `adb shell pm clear com.cookingnote.app` để xóa dữ liệu cũ và buộc Room kích hoạt lại `SeedData.populate`.
+- **Nguyên tắc định vị phần tử UI:**
+  - Ưu tiên định vị động bằng Content Description và Text tiếng Việt có dấu.
+  - Sử dụng tọa độ tuyệt đối chỉ làm phương án dự phòng (fallback) khi kiểm thử trên emulator độ phân giải tiêu chuẩn (1080x2400).
