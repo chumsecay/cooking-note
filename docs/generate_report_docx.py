@@ -437,7 +437,7 @@ def create_report():
         ("pantry_items", "id (Long, AutoGen)", "None", "Kho nguyên liệu thực tế có trong tủ lạnh"),
         ("cook_history", "id (Long, AutoGen)", "recipeId -> recipes(id) [CASCADE]", "Nhật ký lịch sử mỗi lần nấu món ăn"),
         ("tags", "id (Long, AutoGen)", "None", "Nhãn phân loại tự do (Nhanh, Cay, Món tiệc...)"),
-        ("recipe_tag_cross_ref", "(recipeId, tagId)", "recipeId, tagId [CASCADE]", "Bảng quan hệ nhiều - nhiều giữa Recipe và Tag"),
+        ("recipe_tags", "(recipeId, tagId)", "recipeId -> recipes(id), tagId -> tags(id) [CASCADE]", "Bảng quan hệ nhiều - nhiều giữa Recipe và Tag"),
         ("chat_messages", "id (Long, AutoGen)", "None", "Lịch sử tin nhắn giữa người dùng và trợ lý AI"),
         ("ai_query_logs", "id (Long, AutoGen)", "None", "Nhật ký ghi vết hiệu năng và độ trễ các lượt gọi AI")
     ]
@@ -513,11 +513,11 @@ def create_report():
     doc.add_paragraph(
         "• Kết quả thực tế từ Gradle Test Runner:\n"
         "  Lệnh thực thi: ./gradlew.bat :app:testDebugUnitTest\n"
-        "  Tổng số bài test: 100 tests completed\n"
+        "  Tổng số bài test: 135 tests completed\n"
         "  Số bài thất bại: 0 failures (0%)\n"
         "  Số bài bỏ qua: 0 skipped (0%)\n"
         "  Tỷ lệ thành công: 100% PASS\n"
-        "  Thời gian thực thi trung bình: ~11.5 giây trên JVM."
+        "  Thời gian thực thi: ~4 giây trên JVM (135 tests, đo lần chạy 2026-10-03)."
     )
     doc.add_paragraph(
         "• Kết quả biên dịch APK sản phẩm (Build Verification):\n"
